@@ -1,0 +1,29 @@
+version: "3.5"
+
+# If you already have redis in another docker stack you can specify here that network. 
+# And then also specify the network in the 'listener' service
+networks:
+  default:
+      
+
+
+services:
+  listener:
+    build: .
+    volumes:
+      - ".:/srv/listener"
+    environment:
+      - REDIS_STREAM_PORT=6379
+      - LISTENER_MODE=true
+    env_file:
+      - ./listener.env
+    external_links:
+      - "local-reverse-proxy:data.humdata.local"
+
+  # redis is only needed for testing and locally playing with redis
+  # redis:
+  #   image: redis:7-alpine
+  #   hostname: redis
+
+
+
