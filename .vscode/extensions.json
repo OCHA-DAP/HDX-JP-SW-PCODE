@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "mhutchie.git-graph",
-        "ms-python.python"
+        "ms-python.python",
+        "github.vscode-github-actions"
     ]
 }
