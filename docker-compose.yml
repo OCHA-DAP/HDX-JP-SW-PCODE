@@ -13,17 +13,18 @@ services:
     volumes:
       - ".:/srv/listener"
     environment:
-      - REDIS_STREAM_PORT=6379
-      - LISTENER_MODE=true
-    env_file:
-      - ./listener.env
-    external_links:
-      - "local-reverse-proxy:data.humdata.local"
+      REDIS_STREAM_PORT: ${REDIS_STREAM_PORT:-6379}
+      LISTENER_MODE: ${LISTENER_MODE:-true}
+      REDIS_STREAM_HOST: ${REDIS_STREAM_HOST:-redis}
+      REDIS_STREAM_DB: ${REDIS_STREAM_DB:-7}
+      REDIS_STREAM_STREAM_NAME: ${REDIS_STREAM_STREAM_NAME:-hdx_event_stream}
+      REDIS_STREAM_GROUP_NAME: ${REDIS_STREAM_GROUP_NAME:-hdx_jp_sw_pcode_group}
+      REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME:-hdx_jp_sw_pcode_consumer_1}
+      HDX_URL: ${HDX_URL:-https://feature.data-humdata-org.ahconu.org}
+      HDX_KEY: ${HDX_KEY:-YOUR_HDX_TOKEN}
+    # entrypoint: [ "tail", "-f", "/dev/null" ]
 
   # redis is only needed for testing and locally playing with redis
   # redis:
   #   image: redis:7-alpine
   #   hostname: redis
-
-
-
