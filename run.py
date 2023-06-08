@@ -118,7 +118,7 @@ if __name__ == "__main__":
     facade(
         main_function,
         # hdx_site="feature", # passing HDX server via the env variable HDX_URL
-        user_agent="LocationExploration",
+        user_agent="PCodesDetector",
         hdx_read_only=False,
         preprefix="HDXINTERNAL",
         project_config_yaml=join("config", "project_configuration.yml"),
