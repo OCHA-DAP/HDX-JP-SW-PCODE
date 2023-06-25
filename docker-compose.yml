@@ -10,8 +10,8 @@ networks:
 services:
   listener:
     build: .
-    volumes:
-      - ".:/srv/listener"
+    # volumes:
+    #   - ".:/srv/listener"
     environment:
       REDIS_STREAM_PORT: ${REDIS_STREAM_PORT:-6379}
       LISTENER_MODE: ${LISTENER_MODE:-true}
