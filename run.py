@@ -1,4 +1,6 @@
 import logging
+import logging.config
+logging.config.fileConfig('logging.conf')
 import os
 import json
 
@@ -7,16 +9,15 @@ from os.path import join
 from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
 from hdx.data.hdxobject import HDXError
-from hdx.facades.keyword_arguments import facade
 from hdx.utilities.downloader import Download
-from hdx.utilities.easy_logging import setup_logging
 from hdx.utilities.path import temp_dir
 
 from check_location import check_location, get_global_pcodes
 
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
+from helper.facade import facade
 
-setup_logging(log_file='/var/log/listener.log', file_log_level="INFO")
+
 logger = logging.getLogger(__name__)
 
 
