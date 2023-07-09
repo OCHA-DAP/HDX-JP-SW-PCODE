@@ -8,7 +8,6 @@ from os.path import join
 
 from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
-from hdx.data.hdxobject import HDXError
 from hdx.utilities.downloader import Download
 from hdx.utilities.path import temp_dir
 
@@ -16,6 +15,7 @@ from check_location import check_location, get_global_pcodes
 
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 from helper.facade import facade
+from helper.ckan import patch_resource_with_pcode_value
 
 
 logger = logging.getLogger(__name__)
@@ -38,17 +38,20 @@ def listener_main(**ignore):
             downloader,
         )
 
-    with temp_dir(folder="TempLocationExploration") as temp_folder:
-        def event_processor(event):
-            logger.info('Received event: ' + json.dumps(event, ensure_ascii=False, indent=4))
-            dataset_id = event.get('dataset_id')
-            if dataset_id:
-                dataset = Dataset.read_from_hdx(dataset_id)
-                _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
-            return True, 'Success'
+    def event_processor(event):
+        with temp_dir(folder="TempLocationExploration") as temp_folder:
+            try:
+                logger.info('Received event: ' + json.dumps(event, ensure_ascii=False, indent=4))
+                dataset_id = event.get('dataset_id')
+                if dataset_id:
+                    dataset = Dataset.read_from_hdx(dataset_id)
+                    _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
+                return True, 'Success'
+            except Exception as exc:
+                logger.error(f'Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}')
+                return False, str(exc)
 
-
-        event_bus.hdx_listen(event_processor, allowed_event_types=['resource-created', 'resource-data-changed'])
+    event_bus.hdx_listen(event_processor, allowed_event_types=['resource-created', 'resource-data-changed'])
 
 
 def main(**ignore):
@@ -82,17 +85,13 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
             continue
 
         if dataset.get_organization()["name"] == "hot":
-            resource["p_coded"] = False
-            continue
+            pcoded = False
 
         if resource.get_file_type() not in configuration["allowed_filetypes"]:
-            resource["p_coded"] = False
-            continue
+            pcoded = False
 
         if resource["size"] and resource["size"] > configuration["resource_size"]:
-            resource["p_coded"] = False
-            continue
-
+            pcoded = False
         pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
         if mis_pcoded:
             logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
@@ -100,18 +99,12 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
-        resource["p_coded"] = pcoded
+        try:
+            patch_resource_with_pcode_value(resource['id'], pcoded)
+        except Exception as e:
+            logger.exception(f'Could not update resource {resource["id"]} in dataset {dataset["name"]}')
+            raise
 
-    try:
-        dataset.update_in_hdx(
-                    hxl_update=False,
-                    operation="patch",
-                    batch_mode="KEEP_OLD",
-                    skip_validation=True,
-                    ignore_check=True,
-                )
-    except HDXError:
-        logger.exception(f"Could not update {dataset['name']}")
 
 
 if __name__ == "__main__":
