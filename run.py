@@ -81,8 +81,7 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
 
     resources = dataset.get_resources()
     for resource in resources:
-        if resource.get("p_coded") is not None:
-            continue
+        pcoded = resource.get("p_coded")
 
         if dataset.get_organization()["name"] == "hot":
             pcoded = False
@@ -92,19 +91,20 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
 
         if resource["size"] and resource["size"] > configuration["resource_size"]:
             pcoded = False
-        pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
-        if mis_pcoded:
-            logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
 
-        if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        if pcoded is None:
+            pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
+            if mis_pcoded:
+                logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
+
+            if error:
+                logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
         try:
             patch_resource_with_pcode_value(resource['id'], pcoded)
         except Exception as e:
             logger.exception(f'Could not update resource {resource["id"]} in dataset {dataset["name"]}')
             raise
-
 
 
 if __name__ == "__main__":
