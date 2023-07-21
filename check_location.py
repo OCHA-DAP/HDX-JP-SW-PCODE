@@ -216,11 +216,13 @@ def check_location(resource, pcodes, miscodes, temp_folder):
 
     resource_files, error = download_resource(resource, fileext, resource_folder)
     if not resource_files:
+        rmtree(resource_folder)
         return None, None, error
 
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
+        rmtree(resource_folder)
         return None, None, error
 
     for key in contents:
@@ -229,6 +231,7 @@ def check_location(resource, pcodes, miscodes, temp_folder):
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
+        rmtree(resource_folder)
         return pcoded, mis_pcoded, error
 
     for key in contents:
@@ -240,5 +243,4 @@ def check_location(resource, pcodes, miscodes, temp_folder):
         pcoded = False
 
     rmtree(resource_folder)
-
     return pcoded, mis_pcoded, error
