@@ -65,6 +65,10 @@ def download_resource(resource, fileext, resource_folder):
         error = f"Unable to download file"
         return None, error
 
+    if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
+        resource_files = [resource_file]
+        return resource_files, None
+
     if is_zipfile(resource_file) or ".zip" in basename(resource_file):
         temp = join(resource_folder, get_uuid())
         try:
