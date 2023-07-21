@@ -81,7 +81,7 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
 
     resources = dataset.get_resources()
     for resource in resources:
-        pcoded = resource.get("p_coded")
+        pcoded = None
 
         if dataset.get_organization()["name"] == "hot":
             pcoded = False
