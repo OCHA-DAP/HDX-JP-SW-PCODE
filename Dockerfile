@@ -11,7 +11,8 @@ COPY . .
 
 RUN apk add --no-cache git g++ gfortran proj-util && \
     apk add --no-cache --virtual .build-deps python3-dev proj-dev geos-dev musl-dev gdal-dev && \
-    pip3 install -r requirements.txt
+    pip3 install -r initial-requirements.txt
+RUN pip3 install -r requirements.txt
 
 ENTRYPOINT [ "python3", "run.py" ]
 # ENTRYPOINT [ "tail", "-f", "/dev/null" ]
