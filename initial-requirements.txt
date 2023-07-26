@@ -1,0 +1,7 @@
+#Dependecy bug fixes 
+git+https://github.com/alexandru-m-g/pyproj-cython-bugfix.git@main
+
+geopandas~=0.12.2
+Fiona~=1.9.1
+pandas~=1.5.3
+Shapely~=2.0.1

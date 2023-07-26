@@ -12,11 +12,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
 
       - name: Checkout code
         id: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Tag Info
         id: tag_info
@@ -28,6 +33,21 @@ jobs:
       - name: Show image tag
         run: |
           echo "Image tag is ${{ steps.tag_info.outputs.IMAGE_TAG }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          # network=host driver-opt needed to push to local registry
+          driver-opts: network=host
+
+      - name: Build temporary cached image
+        uses: docker/build-push-action@v4
+        with:
+          tags: localhost:5000/myinitial:latest
+          file: "Dockerfile.initial"
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          push: true
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -44,9 +64,13 @@ jobs:
           password: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
         env:
           AWS_REGION: us-east-1
+      - name: Docker images
+        run: docker images
 
       - name: Build, tag, and push image to Amazon ECR
         uses: docker/build-push-action@v4
         with:
           push: true
+          build-contexts: |
+            myinitial:latest=docker-image://localhost:5000/myinitial:latest
           tags: public.ecr.aws/unocha/hdx-jp-sw-pcode:${{ steps.tag_info.outputs.IMAGE_TAG }}
