@@ -46,6 +46,7 @@ def listener_main(**ignore):
                 if dataset_id:
                     dataset = Dataset.read_from_hdx(dataset_id)
                     _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
+                    logger.info(f'Finished processing dataset {dataset.data["name"]}, {dataset.data["id"]}')
                 return True, 'Success'
             except Exception as exc:
                 logger.error(f'Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}')
