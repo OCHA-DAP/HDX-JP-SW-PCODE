@@ -64,5 +64,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
+          pull: false
           context: .
           tags: public.ecr.aws/unocha/hdx-jp-sw-pcode:${{ steps.tag_info.outputs.IMAGE_TAG }}
