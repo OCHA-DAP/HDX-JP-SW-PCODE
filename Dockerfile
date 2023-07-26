@@ -1,4 +1,4 @@
-FROM initial
+FROM myinitial:latest
 
 WORKDIR /srv/listener
 COPY . .

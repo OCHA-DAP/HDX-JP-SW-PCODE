@@ -35,7 +35,7 @@ jobs:
       - name: Build temporary cached image
         uses: docker/build-push-action@v4
         with:
-          tags: initial
+          tags: myinitial:latest
           file: "Dockerfile.initial"
           load: true
           cache-from: type=gha
