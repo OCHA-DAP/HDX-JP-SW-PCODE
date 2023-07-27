@@ -3,6 +3,7 @@ import logging.config
 logging.config.fileConfig('logging.conf')
 import os
 import json
+import datetime
 
 from os.path import join
 
@@ -39,6 +40,7 @@ def listener_main(**ignore):
         )
 
     def event_processor(event):
+        start_time = datetime.datetime.now()
         with temp_dir(folder="TempLocationExploration") as temp_folder:
             try:
                 logger.info('Received event: ' + json.dumps(event, ensure_ascii=False, indent=4))
@@ -46,7 +48,9 @@ def listener_main(**ignore):
                 if dataset_id:
                     dataset = Dataset.read_from_hdx(dataset_id)
                     _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
-                    logger.info(f'Finished processing dataset {dataset.data["name"]}, {dataset.data["id"]}')
+                    end_time = datetime.datetime.now()
+                    elapsed_time = end_time - start_time
+                    logger.info(f'Finished processing dataset {dataset.data["name"]}, {dataset.data["id"]} in {str(elapsed_time)}')
                 return True, 'Success'
             except Exception as exc:
                 logger.error(f'Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}')
