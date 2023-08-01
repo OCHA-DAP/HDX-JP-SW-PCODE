@@ -17,6 +17,7 @@ from check_location import check_location, get_global_pcodes
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 from helper.facade import facade
 from helper.ckan import patch_resource_with_pcode_value
+from helper.util import do_nothing_for_ever
 
 
 logger = logging.getLogger(__name__)
@@ -113,12 +114,15 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
 
 
 if __name__ == "__main__":
-    main_function = listener_main if os.getenv('LISTENER_MODE') == 'true' else main
-    facade(
-        main_function,
-        # hdx_site="feature", # passing HDX server via the env variable HDX_URL
-        user_agent="PCodesDetector",
-        hdx_read_only=False,
-        preprefix="HDXINTERNAL",
-        project_config_yaml=join("config", "project_configuration.yml"),
-    )
+    if os.getenv('WORKER_ENABLED') != 'true' and os.getenv('LISTENER_MODE') == 'true':
+        do_nothing_for_ever()
+    else:
+        main_function = listener_main if os.getenv('LISTENER_MODE') == 'true' else main
+        facade(
+            main_function,
+            # hdx_site="feature", # passing HDX server via the env variable HDX_URL
+            user_agent="PCodesDetector",
+            hdx_read_only=False,
+            preprefix="HDXINTERNAL",
+            project_config_yaml=join("config", "project_configuration.yml"),
+        )
