@@ -1,24 +1,24 @@
 import logging
 import logging.config
-logging.config.fileConfig('logging.conf')
-import os
 import json
 import datetime
 
+from json import dumps
+from os import getenv
 from os.path import join
 
 from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
 from hdx.utilities.downloader import Download
 from hdx.utilities.path import temp_dir
+from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
 from check_location import check_location, get_global_pcodes
-
-from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 from helper.facade import facade
 from helper.ckan import patch_resource_with_pcode_value
 from helper.util import do_nothing_for_ever
 
+logging.config.fileConfig("logging.conf")
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ def listener_main(**ignore):
         start_time = datetime.datetime.now()
         with temp_dir(folder="TempLocationExploration") as temp_folder:
             try:
-                logger.info('Received event: ' + json.dumps(event, ensure_ascii=False, indent=4))
-                dataset_id = event.get('dataset_id')
+                logger.info(f"Received event: {dumps(event, ensure_ascii=False, indent=4)}")
+                dataset_id = event.get("dataset_id")
                 if dataset_id:
                     dataset = Dataset.read_from_hdx(dataset_id)
                     _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
@@ -54,10 +54,10 @@ def listener_main(**ignore):
                     logger.info(f'Finished processing dataset {dataset.data["name"]}, {dataset.data["id"]} in {str(elapsed_time)}')
                 return True, 'Success'
             except Exception as exc:
-                logger.error(f'Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}')
+                logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
                 return False, str(exc)
 
-    event_bus.hdx_listen(event_processor, allowed_event_types=['resource-created', 'resource-data-changed'])
+    event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"])
 
 
 def main(**ignore):
@@ -103,21 +103,21 @@ def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder,
             if mis_pcoded:
                 logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
 
-            if error:
-                logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
         try:
             patch_resource_with_pcode_value(resource['id'], pcoded)
-        except Exception as e:
-            logger.exception(f'Could not update resource {resource["id"]} in dataset {dataset["name"]}')
+        except Exception:
+            logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
 
 
 if __name__ == "__main__":
-    if os.getenv('WORKER_ENABLED') != 'true' and os.getenv('LISTENER_MODE') == 'true':
+    if getenv("WORKER_ENABLED") != "true" and getenv("LISTENER_MODE") == "true":
         do_nothing_for_ever()
     else:
-        main_function = listener_main if os.getenv('LISTENER_MODE') == 'true' else main
+        main_function = listener_main if getenv("LISTENER_MODE") == "true" else main
         facade(
             main_function,
             # hdx_site="feature", # passing HDX server via the env variable HDX_URL
