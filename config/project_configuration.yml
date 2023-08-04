@@ -16,3 +16,6 @@ allowed_filetypes:
   - "xlsx"
 
 resource_size: 1073741824
+
+org_exceptions:
+  - "hot"
