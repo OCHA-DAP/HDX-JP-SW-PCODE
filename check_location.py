@@ -32,6 +32,10 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
             pcodes[iso3_code].append(pcode)
         else:
             pcodes[iso3_code] = [pcode]
+        if iso3_code in miscodes:
+            miscodes[iso3_code].append(pcode)
+        else:
+            miscodes[iso3_code] = [pcode]
         pcodes["WORLD"].append(pcode)
 
         iso2_code = Country.get_iso2_from_iso3(iso3_code)
@@ -39,10 +43,7 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
             continue
 
         pcode_no0 = pcode.replace("0", "")
-        if iso3_code in miscodes:
-            miscodes[iso3_code].append(pcode_no0)
-        else:
-            miscodes[iso3_code] = [pcode_no0]
+        miscodes[iso3_code].append(pcode_no0)
         miscodes["WORLD"].append(pcode_no0)
 
         if iso3_code in pcode_no0:
@@ -54,6 +55,9 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
             miscode = pcode_no0.replace(iso2_code, iso3_code)
             miscodes[iso3_code].append(miscode)
             miscodes["WORLD"].append(miscode)
+
+    for iso in miscodes:
+        miscodes[iso] = list(set(miscodes[iso]))
 
     return pcodes, miscodes
 
