@@ -96,8 +96,18 @@ def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configur
     if resource.get_file_type().lower() not in configuration["allowed_filetypes"]:
         pcoded = False
 
-    if resource["size"] and resource["size"] > configuration["resource_size"]:
-        pcoded = False
+    if pcoded is None:
+        size = resource["size"]
+        if (size is None or size == 0) and resource["resource_type"] == "api":
+            try:
+                resource_info = requests.head(resource["url"])
+                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
+                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
+            except:
+                size = configuration["resource_size"]
+
+        if size >= configuration["resource_size"]:
+            pcoded = False
 
     if pcoded is None:
         pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
