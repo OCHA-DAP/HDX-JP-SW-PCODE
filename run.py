@@ -1,8 +1,7 @@
 import logging
 import logging.config
-import json
 import datetime
-
+import requests
 from json import dumps
 from os import getenv
 from os.path import join
@@ -46,13 +45,20 @@ def listener_main(**ignore):
             try:
                 logger.info(f"Received event: {dumps(event, ensure_ascii=False, indent=4)}")
                 dataset_id = event.get("dataset_id")
-                if dataset_id:
+                resource_id = event.get("resource_id")
+                if dataset_id and resource_id:
                     dataset = Dataset.read_from_hdx(dataset_id)
-                    _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
-                    end_time = datetime.datetime.now()
-                    elapsed_time = end_time - start_time
-                    logger.info(f'Finished processing dataset {dataset.data["name"]}, {dataset.data["id"]} in {str(elapsed_time)}')
-                return True, 'Success'
+                    locations = dataset.get_location_iso3s()
+                    pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
+                    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
+                    for resource in dataset.get_resources():
+                        if resource["id"] != resource_id:
+                            continue
+                        _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration)
+                        end_time = datetime.datetime.now()
+                        elapsed_time = end_time - start_time
+                        logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
+                return True, "Success"
             except Exception as exc:
                 logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
                 return False, str(exc)
@@ -71,41 +77,37 @@ def main(**ignore):
         )
 
     with temp_dir(folder="TempLocationExploration") as temp_folder:
-        datasets = Dataset.search_in_hdx(
-            fq='cod_level:"cod-standard"'
-        ) + Dataset.search_in_hdx(
-            fq='cod_level:"cod-enhanced"'
-        )
-
+        datasets = Dataset.get_all_datasets(rows=100)
         for dataset in datasets:
-            _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset)
+            locations = dataset.get_location_iso3s()
+            pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
+            miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
+            resources = dataset.get_resources()
+            for resource in resources:
+                _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration)
 
-def _process_dataset(configuration, global_pcodes, global_miscodes, temp_folder, dataset):
-    locations = dataset.get_location_iso3s()
-    pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
-    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
 
-    resources = dataset.get_resources()
-    for resource in resources:
-        pcoded = None
+def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration):
+    pcoded = None
 
-        if dataset.get_organization()["name"] == "hot":
-            pcoded = False
+    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
+        pcoded = False
 
-        if resource.get_file_type() not in configuration["allowed_filetypes"]:
-            pcoded = False
+    if resource.get_file_type().lower() not in configuration["allowed_filetypes"]:
+        pcoded = False
 
-        if resource["size"] and resource["size"] > configuration["resource_size"]:
-            pcoded = False
+    if resource["size"] and resource["size"] > configuration["resource_size"]:
+        pcoded = False
 
-        if pcoded is None:
-            pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
-            if mis_pcoded:
-                logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
+    if pcoded is None:
+        pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
+        if mis_pcoded:
+            logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
 
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
+    if pcoded is not None:
         try:
             patch_resource_with_pcode_value(resource['id'], pcoded)
         except Exception:
