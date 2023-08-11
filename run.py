@@ -1,5 +1,8 @@
 import logging
 import logging.config
+
+logging.config.fileConfig("logging.conf")
+
 import datetime
 import requests
 from json import dumps
@@ -16,8 +19,6 @@ from check_location import check_location, get_global_pcodes
 from helper.facade import facade
 from helper.ckan import patch_resource_with_pcode_value
 from helper.util import do_nothing_for_ever
-
-logging.config.fileConfig("logging.conf")
 
 logger = logging.getLogger(__name__)
 
