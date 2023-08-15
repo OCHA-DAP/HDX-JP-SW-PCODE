@@ -16,10 +16,10 @@ from hdx.utilities.uuid import get_uuid
 logger = logging.getLogger(__name__)
 
 
-def get_global_pcodes(dataset_info, downloader, locations=list()):
+def get_global_pcodes(dataset_info, retriever, locations=list()):
     dataset = Dataset.read_from_hdx(dataset_info["dataset"])
     resource = [r for r in dataset.get_resources() if r["name"] == dataset_info["name"]]
-    headers, iterator = downloader.get_tabular_rows(resource[0]["url"], dict_form=True)
+    headers, iterator = retriever.get_tabular_rows(resource[0]["url"], dict_form=True)
 
     pcodes = {"WORLD": []}
     miscodes = {"WORLD": []}
@@ -58,6 +58,7 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
 
     for iso in miscodes:
         miscodes[iso] = list(set(miscodes[iso]))
+        miscodes[iso].sort()
 
     return pcodes, miscodes
 

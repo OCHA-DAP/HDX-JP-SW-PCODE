@@ -13,6 +13,7 @@ from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
 from hdx.utilities.downloader import Download
 from hdx.utilities.path import temp_dir
+from hdx.utilities.retriever import Retrieve
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
 from check_location import check_location, get_global_pcodes
@@ -34,11 +35,15 @@ def listener_main(**ignore):
 
     configuration = Configuration.read()
 
-    with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
-        global_pcodes, global_miscodes = get_global_pcodes(
-            configuration["global_pcodes"],
-            downloader,
-        )
+    with temp_dir() as temp_f:
+        with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
+            retriever = Retrieve(
+                downloader, temp_f, "saved_data", temp_f, save=False, use_saved=False
+            )
+            global_pcodes, global_miscodes = get_global_pcodes(
+                configuration["global_pcodes"],
+                retriever,
+            )
 
     def event_processor(event):
         start_time = datetime.datetime.now()
@@ -71,24 +76,35 @@ def main(**ignore):
 
     configuration = Configuration.read()
 
-    with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
-        global_pcodes, global_miscodes = get_global_pcodes(
-            configuration["global_pcodes"],
-            downloader,
-        )
-
     with temp_dir(folder="TempLocationExploration") as temp_folder:
-        datasets = Dataset.get_all_datasets(rows=100)
-        for dataset in datasets:
-            locations = dataset.get_location_iso3s()
-            pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
-            miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
-            resources = dataset.get_resources()
-            for resource in resources:
-                _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration)
+        with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
+            retriever = Retrieve(
+                downloader, temp_folder, "saved_data", temp_folder, save=True, use_saved=False
+            )
+            global_pcodes, global_miscodes = get_global_pcodes(
+                configuration["global_pcodes"],
+                retriever,
+            )
+            datasets = Dataset.get_all_datasets(rows=100)
+            for dataset in datasets:
+                locations = dataset.get_location_iso3s()
+                pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
+                miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
+                resources = dataset.get_resources()
+                for resource in resources:
+                    pcoded = _process_resource(
+                        resource,
+                        dataset,
+                        pcodes,
+                        miscodes,
+                        temp_folder,
+                        configuration,
+                        update=False,
+                    )
+                    logger.info(f"{resource['name']}: {pcoded}")
 
 
-def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration):
+def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration, update=True):
     pcoded = None
 
     if dataset.get_organization()["name"] in configuration["org_exceptions"]:
@@ -118,12 +134,14 @@ def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configur
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
-    if pcoded is not None:
+    if update:
         try:
             patch_resource_with_pcode_value(resource['id'], pcoded)
         except Exception:
             logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
+
+    return pcoded
 
 
 if __name__ == "__main__":
