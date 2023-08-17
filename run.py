@@ -92,7 +92,7 @@ def main(**ignore):
                 miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
                 resources = dataset.get_resources()
                 for resource in resources:
-                    pcoded, miscoded = _process_resource(
+                    pcoded, mis_pcoded = _process_resource(
                         resource,
                         dataset,
                         pcodes,
@@ -101,39 +101,11 @@ def main(**ignore):
                         configuration,
                         update=False,
                     )
-                    logger.info(f"{resource['name']}: {pcoded}, {miscoded}")
+                    logger.info(f"{resource['name']}: {pcoded}, {mis_pcoded}")
 
 
 def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration, update=True):
-    pcoded = None
-    miscoded = None
-
-    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
-        pcoded = False
-
-    if resource.get_file_type().lower() not in configuration["allowed_filetypes"]:
-        pcoded = False
-
-    if pcoded is None:
-        size = resource["size"]
-        if (size is None or size == 0) and resource["resource_type"] == "api":
-            try:
-                resource_info = requests.head(resource["url"])
-                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
-                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
-            except:
-                size = configuration["resource_size"]
-
-        if size >= configuration["resource_size"]:
-            pcoded = False
-
-    if pcoded is None:
-        pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
-        if mis_pcoded:
-            logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
-
-        if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+    pcoded, mis_pcoded = check_location(resource, dataset, pcodes, miscodes, temp_folder, configuration)
 
     if update:
         try:
@@ -142,7 +114,7 @@ def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configur
             logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
 
-    return pcoded, miscoded
+    return pcoded, mis_pcoded
 
 
 if __name__ == "__main__":

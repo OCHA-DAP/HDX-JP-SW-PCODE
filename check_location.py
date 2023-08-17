@@ -6,6 +6,7 @@ from glob import glob
 from os import remove
 from os.path import basename, dirname, join
 from pandas import isna, read_csv, read_excel
+from requests import head
 from shutil import rmtree
 from zipfile import ZipFile, is_zipfile
 
@@ -16,7 +17,7 @@ from hdx.utilities.uuid import get_uuid
 logger = logging.getLogger(__name__)
 
 
-def get_global_pcodes(dataset_info, retriever, locations=list()):
+def get_global_pcodes(dataset_info, retriever, locations=None):
     dataset = Dataset.read_from_hdx(dataset_info["dataset"])
     resource = [r for r in dataset.get_resources() if r["name"] == dataset_info["name"]]
     headers, iterator = retriever.get_tabular_rows(resource[0]["url"], dict_form=True)
@@ -26,7 +27,7 @@ def get_global_pcodes(dataset_info, retriever, locations=list()):
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
-        if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
+        if locations and len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
             continue
         if iso3_code in pcodes:
             pcodes[iso3_code].append(pcode)
@@ -224,7 +225,7 @@ def remove_files(files=None, folder=None):
             pass
 
 
-def check_location(resource, pcodes, miscodes, temp_folder):
+def check_location(resource, dataset, pcodes, miscodes, temp_folder, configuration):
     pcoded = None
     mis_pcoded = None
 
@@ -235,16 +236,42 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if fileext == "geopackage":
         fileext = "gpkg"
 
+    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
+        pcoded = False
+
+    if filetype.lower() not in configuration["allowed_filetypes"]:
+        pcoded = False
+
+    if pcoded is None:
+        size = resource["size"]
+        if (size is None or size == 0) and resource["resource_type"] == "api":
+            try:
+                resource_info = head(resource["url"])
+                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
+                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
+            except:
+                size = configuration["resource_size"]
+
+        if size >= configuration["resource_size"]:
+            pcoded = False
+
+    if pcoded is False:
+        return pcoded, mis_pcoded
+
     resource_files, unzip_folder, error = download_resource(resource, fileext, temp_folder)
     if not resource_files:
         remove_files(folder=unzip_folder)
-        return None, None, error
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return None, None
 
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
         remove_files(resource_files, unzip_folder)
-        return None, None, error
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return None, None
 
     for key in contents:
         if pcoded:
@@ -253,7 +280,9 @@ def check_location(resource, pcodes, miscodes, temp_folder):
 
     if pcoded:
         remove_files(resource_files, unzip_folder)
-        return pcoded, mis_pcoded, error
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return pcoded, mis_pcoded
 
     for key in contents:
         if mis_pcoded:
@@ -263,5 +292,11 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if not error and pcoded is None:
         pcoded = False
 
+    if mis_pcoded:
+        logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
+
+    if error:
+        logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+
     remove_files(resource_files, unzip_folder)
-    return pcoded, mis_pcoded, error
+    return pcoded, mis_pcoded
