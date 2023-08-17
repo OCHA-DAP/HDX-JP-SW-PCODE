@@ -3,7 +3,7 @@ import re
 from fiona import listlayers
 from geopandas import read_file
 from glob import glob
-from os import mkdir
+from os import remove
 from os.path import basename, dirname, join
 from pandas import isna, read_csv, read_excel
 from shutil import rmtree
@@ -64,25 +64,26 @@ def get_global_pcodes(dataset_info, retriever, locations=list()):
 
 
 def download_resource(resource, fileext, resource_folder):
+    unzip_folder = None
     try:
         _, resource_file = resource.download(folder=resource_folder)
     except:
         error = f"Unable to download file"
-        return None, error
+        return None, unzip_folder, error
 
     if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
         resource_files = [resource_file]
-        return resource_files, None
+        return resource_files, unzip_folder, None
 
     if is_zipfile(resource_file) or ".zip" in basename(resource_file):
-        temp = join(resource_folder, get_uuid())
+        unzip_folder = join(resource_folder, get_uuid())
         try:
             with ZipFile(resource_file, "r") as z:
-                z.extractall(temp)
+                z.extractall(unzip_folder)
         except:
             error = f"Unable to unzip resource"
-            return None, error
-        resource_files = glob(join(temp, "**", f"*.{fileext}"), recursive=True)
+            return None, unzip_folder, error
+        resource_files = glob(join(unzip_folder, "**", f"*.{fileext}"), recursive=True)
         if len(resource_files) > 1:  # make sure to remove directories containing the actual files
             resource_files = [r for r in resource_files
                               if sum([r in rs for rs in resource_files if not rs == r]) == 0]
@@ -93,7 +94,7 @@ def download_resource(resource, fileext, resource_folder):
     else:
         resource_files = [resource_file]
 
-    return resource_files, None
+    return resource_files, unzip_folder, None
 
 
 def read_downloaded_data(resource_files, fileext):
@@ -209,12 +210,23 @@ def check_pcoded(df, pcodes, miscodes=False):
     return pcoded
 
 
+def remove_files(files=None, folder=None):
+    if files:
+        for f in files:
+            try:
+                remove(f)
+            except FileNotFoundError:
+                continue
+    if folder:
+        try:
+            rmtree(folder)
+        except (FileNotFoundError, TypeError):
+            pass
+
+
 def check_location(resource, pcodes, miscodes, temp_folder):
     pcoded = None
     mis_pcoded = None
-
-    resource_folder = join(temp_folder, get_uuid())
-    mkdir(resource_folder)
 
     filetype = resource.get_file_type()
     fileext = filetype
@@ -223,15 +235,15 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if fileext == "geopackage":
         fileext = "gpkg"
 
-    resource_files, error = download_resource(resource, fileext, resource_folder)
+    resource_files, unzip_folder, error = download_resource(resource, fileext, temp_folder)
     if not resource_files:
-        rmtree(resource_folder)
+        remove_files(folder=unzip_folder)
         return None, None, error
 
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
-        rmtree(resource_folder)
+        remove_files(resource_files, unzip_folder)
         return None, None, error
 
     for key in contents:
@@ -240,7 +252,7 @@ def check_location(resource, pcodes, miscodes, temp_folder):
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
-        rmtree(resource_folder)
+        remove_files(resource_files, unzip_folder)
         return pcoded, mis_pcoded, error
 
     for key in contents:
@@ -251,5 +263,5 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if not error and pcoded is None:
         pcoded = False
 
-    rmtree(resource_folder)
+    remove_files(resource_files, unzip_folder)
     return pcoded, mis_pcoded, error
