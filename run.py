@@ -92,7 +92,7 @@ def main(**ignore):
                 miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
                 resources = dataset.get_resources()
                 for resource in resources:
-                    pcoded = _process_resource(
+                    pcoded, miscoded = _process_resource(
                         resource,
                         dataset,
                         pcodes,
@@ -101,11 +101,12 @@ def main(**ignore):
                         configuration,
                         update=False,
                     )
-                    logger.info(f"{resource['name']}: {pcoded}")
+                    logger.info(f"{resource['name']}: {pcoded}, {miscoded}")
 
 
 def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration, update=True):
     pcoded = None
+    miscoded = None
 
     if dataset.get_organization()["name"] in configuration["org_exceptions"]:
         pcoded = False
@@ -141,7 +142,7 @@ def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configur
             logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
 
-    return pcoded
+    return pcoded, miscoded
 
 
 if __name__ == "__main__":
