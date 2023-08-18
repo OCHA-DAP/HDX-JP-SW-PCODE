@@ -36,7 +36,7 @@ def listener_main(**ignore):
     with temp_dir(folder="TempPCodeDetector") as temp_folder:
         with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
             retriever = Retrieve(
-                downloader, temp_f, "saved_data", temp_f, save=False, use_saved=False
+                downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
             )
             global_pcodes, global_miscodes = get_global_pcodes(
                 configuration["global_pcodes"],
@@ -78,7 +78,7 @@ def main(**ignore):
     with temp_dir(folder="TempPCodeDetector") as temp_folder:
         with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
             retriever = Retrieve(
-                downloader, temp_folder, "saved_data", temp_folder, save=True, use_saved=False
+                downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
             )
             global_pcodes, global_miscodes = get_global_pcodes(
                 configuration["global_pcodes"],
