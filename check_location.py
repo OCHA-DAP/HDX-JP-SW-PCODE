@@ -111,6 +111,7 @@ def download_resource(resource, fileext, retriever):
 
     else:
         resource_files = [resource_file]
+        parent_folders = None
 
     return resource_files, parent_folders, None
 
