@@ -33,7 +33,7 @@ def listener_main(**ignore):
 
     configuration = Configuration.read()
 
-    with temp_dir() as temp_f:
+    with temp_dir(folder="TempPCodeDetector") as temp_folder:
         with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
             retriever = Retrieve(
                 downloader, temp_f, "saved_data", temp_f, save=False, use_saved=False
@@ -45,7 +45,7 @@ def listener_main(**ignore):
 
     def event_processor(event):
         start_time = datetime.datetime.now()
-        with temp_dir(folder="TempLocationExploration") as temp_folder:
+        with temp_dir(folder="TempPCodeDetector") as temp_folder:
             with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
                 retriever = Retrieve(
                     downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
@@ -75,7 +75,7 @@ def main(**ignore):
 
     configuration = Configuration.read()
 
-    with temp_dir(folder="TempLocationExploration") as temp_folder:
+    with temp_dir(folder="TempPCodeDetector") as temp_folder:
         with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
             retriever = Retrieve(
                 downloader, temp_folder, "saved_data", temp_folder, save=True, use_saved=False
