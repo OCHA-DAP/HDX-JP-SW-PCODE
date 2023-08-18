@@ -1,13 +1,14 @@
+import gzip
 import logging
 import re
 from fiona import listlayers
 from geopandas import read_file
 from glob import glob
-from os import remove
+from os import mkdir, remove
 from os.path import basename, dirname, join
 from pandas import isna, read_csv, read_excel
 from requests import head
-from shutil import rmtree
+from shutil import copyfileobj, rmtree
 from zipfile import ZipFile, is_zipfile
 
 from hdx.data.dataset import Dataset
@@ -66,25 +67,35 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
 
 
 def download_resource(resource, fileext, retriever):
-    parent_folder = None
     try:
         resource_file = retriever.download_file(resource["url"])
     except:
         error = f"Unable to download file"
-        return None, parent_folder, error
+        return None, None, error
 
     if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
         resource_files = [resource_file]
-        return resource_files, parent_folder, None
+        return resource_files, None, None
 
-    if is_zipfile(resource_file) or ".zip" in basename(resource_file):
-        unzip_folder = join(retriever.temp_dir, get_uuid())
-        try:
-            with ZipFile(resource_file, "r") as z:
-                z.extractall(parent_folder)
-        except:
-            error = f"Unable to unzip resource"
-            return None, parent_folder, error
+    if is_zipfile(resource_file) or ".zip" in basename(resource_file) or ".gz" in basename(resource_file):
+        parent_folder = join(retriever.temp_dir, get_uuid())
+        parent_folders = [parent_folder, resource_file]
+        if ".gz" in basename(resource_file):
+            try:
+                mkdir(parent_folder)
+                with gzip.open(resource_file, "rb") as gz:
+                    with open(join(parent_folder, basename(resource_file.replace(".gz", ".gpkg"))), "wb") as gz_out:
+                        copyfileobj(gz, gz_out)
+            except:
+                error = f"Unable to unzip resource"
+                return None, parent_folders, error
+        else:
+            try:
+                with ZipFile(resource_file, "r") as z:
+                    z.extractall(parent_folder)
+            except:
+                error = f"Unable to unzip resource"
+                return None, parent_folders, error
         resource_files = glob(join(parent_folder, "**", f"*.{fileext}"), recursive=True)
         if len(resource_files) > 1:  # make sure to remove directories containing the actual files
             resource_files = [r for r in resource_files
@@ -94,14 +105,14 @@ def download_resource(resource, fileext, retriever):
         if fileext in ["gdb", "gpkg"]:
             resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
 
-    elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file):
+    elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
         resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
-        parent_folder = resource_file
+        parent_folders = [resource_file]
 
     else:
         resource_files = [resource_file]
 
-    return resource_files, parent_folder, None
+    return resource_files, parent_folders, None
 
 
 def read_downloaded_data(resource_files, fileext):
@@ -217,18 +228,20 @@ def check_pcoded(df, pcodes, miscodes=False):
     return pcoded
 
 
-def remove_files(files=None, folder=None):
+def remove_files(files=None, folders=None):
     if files:
-        for f in files:
-            try:
-                remove(f)
-                rmtree(f)
-            except (FileNotFoundError, NotADirectoryError, TypeError):
-                continue
-    if folder:
+        to_delete = files
+        if folders:
+            to_delete = files + folders
+    elif folders:
+        to_delete = folders
+    for f in to_delete:
         try:
-            rmtree(folder)
-            remove(folder)
+            remove(f)
+        except (FileNotFoundError, NotADirectoryError, TypeError):
+            pass
+        try:
+            rmtree(f)
         except (FileNotFoundError, NotADirectoryError, TypeError):
             pass
 
@@ -270,9 +283,9 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     if pcoded is False:
         return pcoded, mis_pcoded
 
-    resource_files, parent_folder, error = download_resource(resource, fileext, retriever)
+    resource_files, parent_folders, error = download_resource(resource, fileext, retriever)
     if not resource_files:
-        remove_files(folder=parent_folder)
+        remove_files(folders=parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -280,7 +293,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
-        remove_files(resource_files, parent_folder)
+        remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -291,7 +304,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
-        remove_files(resource_files, parent_folder)
+        remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return pcoded, mis_pcoded
@@ -310,7 +323,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     if error:
         logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
-    remove_files(resource_files, parent_folder)
+    remove_files(resource_files, parent_folders)
 
     if update:
         try:
