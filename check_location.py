@@ -246,7 +246,9 @@ def remove_files(files=None, folders=None):
             pass
 
 
-def process_resource(resource, dataset, global_pcodes, global_miscodes, retriever, configuration, update=True):
+def process_resource(
+        resource, dataset, global_pcodes, global_miscodes, retriever, configuration, update=True, cleanup=True
+):
     pcoded = None
     mis_pcoded = None
 
@@ -285,7 +287,8 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
 
     resource_files, parent_folders, error = download_resource(resource, fileext, retriever)
     if not resource_files:
-        remove_files(folders=parent_folders)
+        if cleanup:
+            remove_files(folders=parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -293,7 +296,8 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
-        remove_files(resource_files, parent_folders)
+        if cleanup:
+            remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -304,7 +308,8 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
-        remove_files(resource_files, parent_folders)
+        if cleanup:
+            remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return pcoded, mis_pcoded
@@ -323,7 +328,8 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     if error:
         logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
-    remove_files(resource_files, parent_folders)
+    if cleanup:
+        remove_files(resource_files, parent_folders)
 
     if update:
         try:
