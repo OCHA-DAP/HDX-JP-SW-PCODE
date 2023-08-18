@@ -13,6 +13,7 @@ from zipfile import ZipFile, is_zipfile
 from hdx.data.dataset import Dataset
 from hdx.location.country import Country
 from hdx.utilities.uuid import get_uuid
+from helper.ckan import patch_resource_with_pcode_value
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +65,10 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
     return pcodes, miscodes
 
 
-def download_resource(resource, fileext, resource_folder):
+def download_resource(resource, fileext, retriever):
     unzip_folder = None
     try:
-        _, resource_file = resource.download(folder=resource_folder)
+        resource_file = retriever.download_file(resource["url"])
     except:
         error = f"Unable to download file"
         return None, unzip_folder, error
@@ -77,7 +78,7 @@ def download_resource(resource, fileext, resource_folder):
         return resource_files, unzip_folder, None
 
     if is_zipfile(resource_file) or ".zip" in basename(resource_file):
-        unzip_folder = join(resource_folder, get_uuid())
+        unzip_folder = join(retriever.temp_dir, get_uuid())
         try:
             with ZipFile(resource_file, "r") as z:
                 z.extractall(unzip_folder)
@@ -198,7 +199,7 @@ def check_pcoded(df, pcodes, miscodes=False):
         if pcoded:
             break
         headers = h.split("||")
-        pcoded_header = any([bool(re.match(header_exp, head, re.IGNORECASE)) for head in headers])
+        pcoded_header = any([bool(re.match(header_exp, hh, re.IGNORECASE)) for hh in headers])
         if not pcoded_header:
             continue
         column = df[h].dropna().astype("string").str.upper()
@@ -229,9 +230,13 @@ def remove_files(files=None, folder=None):
             pass
 
 
-def check_location(resource, dataset, pcodes, miscodes, temp_folder, configuration):
+def process_resource(resource, dataset, global_pcodes, global_miscodes, retriever, configuration, update=True):
     pcoded = None
     mis_pcoded = None
+
+    locations = dataset.get_location_iso3s()
+    pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
+    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
 
     filetype = resource.get_file_type()
     fileext = filetype
@@ -262,7 +267,7 @@ def check_location(resource, dataset, pcodes, miscodes, temp_folder, configurati
     if pcoded is False:
         return pcoded, mis_pcoded
 
-    resource_files, unzip_folder, error = download_resource(resource, fileext, temp_folder)
+    resource_files, unzip_folder, error = download_resource(resource, fileext, retriever)
     if not resource_files:
         remove_files(folder=unzip_folder)
         if error:
@@ -303,4 +308,12 @@ def check_location(resource, dataset, pcodes, miscodes, temp_folder, configurati
         logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
     remove_files(resource_files, unzip_folder)
+
+    if update:
+        try:
+            patch_resource_with_pcode_value(resource['id'], pcoded)
+        except Exception:
+            logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
+            raise
+
     return pcoded, mis_pcoded
