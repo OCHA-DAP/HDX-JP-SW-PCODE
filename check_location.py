@@ -92,6 +92,10 @@ def download_resource(resource, fileext, resource_folder):
             resource_files = [resource_file]
         if fileext in ["gdb", "gpkg"]:
             resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+
+    elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file):
+        resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
+
     else:
         resource_files = [resource_file]
 
