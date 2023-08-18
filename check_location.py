@@ -1,32 +1,35 @@
+import gzip
 import logging
 import re
 from fiona import listlayers
 from geopandas import read_file
 from glob import glob
-from os import mkdir
+from os import mkdir, remove
 from os.path import basename, dirname, join
 from pandas import isna, read_csv, read_excel
-from shutil import rmtree
+from requests import head
+from shutil import copyfileobj, rmtree
 from zipfile import ZipFile, is_zipfile
 
 from hdx.data.dataset import Dataset
 from hdx.location.country import Country
 from hdx.utilities.uuid import get_uuid
+from helper.ckan import patch_resource_with_pcode_value
 
 logger = logging.getLogger(__name__)
 
 
-def get_global_pcodes(dataset_info, downloader, locations=list()):
+def get_global_pcodes(dataset_info, retriever, locations=None):
     dataset = Dataset.read_from_hdx(dataset_info["dataset"])
     resource = [r for r in dataset.get_resources() if r["name"] == dataset_info["name"]]
-    headers, iterator = downloader.get_tabular_rows(resource[0]["url"], dict_form=True)
+    headers, iterator = retriever.get_tabular_rows(resource[0]["url"], dict_form=True)
 
     pcodes = {"WORLD": []}
     miscodes = {"WORLD": []}
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
-        if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
+        if locations and len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
             continue
         if iso3_code in pcodes:
             pcodes[iso3_code].append(pcode)
@@ -58,30 +61,42 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
 
     for iso in miscodes:
         miscodes[iso] = list(set(miscodes[iso]))
+        miscodes[iso].sort()
 
     return pcodes, miscodes
 
 
-def download_resource(resource, fileext, resource_folder):
+def download_resource(resource, fileext, retriever):
     try:
-        _, resource_file = resource.download(folder=resource_folder)
+        resource_file = retriever.download_file(resource["url"])
     except:
         error = f"Unable to download file"
-        return None, error
+        return None, None, error
 
     if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
         resource_files = [resource_file]
-        return resource_files, None
+        return resource_files, None, None
 
-    if is_zipfile(resource_file) or ".zip" in basename(resource_file):
-        temp = join(resource_folder, get_uuid())
-        try:
-            with ZipFile(resource_file, "r") as z:
-                z.extractall(temp)
-        except:
-            error = f"Unable to unzip resource"
-            return None, error
-        resource_files = glob(join(temp, "**", f"*.{fileext}"), recursive=True)
+    if is_zipfile(resource_file) or ".zip" in basename(resource_file) or ".gz" in basename(resource_file):
+        parent_folder = join(retriever.temp_dir, get_uuid())
+        parent_folders = [parent_folder, resource_file]
+        if ".gz" in basename(resource_file):
+            try:
+                mkdir(parent_folder)
+                with gzip.open(resource_file, "rb") as gz:
+                    with open(join(parent_folder, basename(resource_file.replace(".gz", ".gpkg"))), "wb") as gz_out:
+                        copyfileobj(gz, gz_out)
+            except:
+                error = f"Unable to unzip resource"
+                return None, parent_folders, error
+        else:
+            try:
+                with ZipFile(resource_file, "r") as z:
+                    z.extractall(parent_folder)
+            except:
+                error = f"Unable to unzip resource"
+                return None, parent_folders, error
+        resource_files = glob(join(parent_folder, "**", f"*.{fileext}"), recursive=True)
         if len(resource_files) > 1:  # make sure to remove directories containing the actual files
             resource_files = [r for r in resource_files
                               if sum([r in rs for rs in resource_files if not rs == r]) == 0]
@@ -89,10 +104,16 @@ def download_resource(resource, fileext, resource_folder):
             resource_files = [resource_file]
         if fileext in ["gdb", "gpkg"]:
             resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+
+    elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
+        resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
+        parent_folders = [resource_file]
+
     else:
         resource_files = [resource_file]
+        parent_folders = None
 
-    return resource_files, None
+    return resource_files, parent_folders, None
 
 
 def read_downloaded_data(resource_files, fileext):
@@ -191,7 +212,7 @@ def check_pcoded(df, pcodes, miscodes=False):
         if pcoded:
             break
         headers = h.split("||")
-        pcoded_header = any([bool(re.match(header_exp, head, re.IGNORECASE)) for head in headers])
+        pcoded_header = any([bool(re.match(header_exp, hh, re.IGNORECASE)) for hh in headers])
         if not pcoded_header:
             continue
         column = df[h].dropna().astype("string").str.upper()
@@ -208,12 +229,33 @@ def check_pcoded(df, pcodes, miscodes=False):
     return pcoded
 
 
-def check_location(resource, pcodes, miscodes, temp_folder):
+def remove_files(files=None, folders=None):
+    if files:
+        to_delete = files
+        if folders:
+            to_delete = files + folders
+    elif folders:
+        to_delete = folders
+    for f in to_delete:
+        try:
+            remove(f)
+        except (FileNotFoundError, NotADirectoryError, TypeError):
+            pass
+        try:
+            rmtree(f)
+        except (FileNotFoundError, NotADirectoryError, TypeError):
+            pass
+
+
+def process_resource(
+        resource, dataset, global_pcodes, global_miscodes, retriever, configuration, update=True, cleanup=True
+):
     pcoded = None
     mis_pcoded = None
 
-    resource_folder = join(temp_folder, get_uuid())
-    mkdir(resource_folder)
+    locations = dataset.get_location_iso3s()
+    pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
+    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
 
     filetype = resource.get_file_type()
     fileext = filetype
@@ -222,16 +264,44 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if fileext == "geopackage":
         fileext = "gpkg"
 
-    resource_files, error = download_resource(resource, fileext, resource_folder)
+    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
+        pcoded = False
+
+    if filetype.lower() not in configuration["allowed_filetypes"]:
+        pcoded = False
+
+    if pcoded is None:
+        size = resource["size"]
+        if (size is None or size == 0) and resource["resource_type"] == "api":
+            try:
+                resource_info = head(resource["url"])
+                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
+                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
+            except:
+                size = configuration["resource_size"]
+
+        if size >= configuration["resource_size"]:
+            pcoded = False
+
+    if pcoded is False:
+        return pcoded, mis_pcoded
+
+    resource_files, parent_folders, error = download_resource(resource, fileext, retriever)
     if not resource_files:
-        rmtree(resource_folder)
-        return None, None, error
+        if cleanup:
+            remove_files(folders=parent_folders)
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return None, None
 
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
-        rmtree(resource_folder)
-        return None, None, error
+        if cleanup:
+            remove_files(resource_files, parent_folders)
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return None, None
 
     for key in contents:
         if pcoded:
@@ -239,8 +309,11 @@ def check_location(resource, pcodes, miscodes, temp_folder):
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
-        rmtree(resource_folder)
-        return pcoded, mis_pcoded, error
+        if cleanup:
+            remove_files(resource_files, parent_folders)
+        if error:
+            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+        return pcoded, mis_pcoded
 
     for key in contents:
         if mis_pcoded:
@@ -250,5 +323,20 @@ def check_location(resource, pcodes, miscodes, temp_folder):
     if not error and pcoded is None:
         pcoded = False
 
-    rmtree(resource_folder)
-    return pcoded, mis_pcoded, error
+    if mis_pcoded:
+        logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
+
+    if error:
+        logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+
+    if cleanup:
+        remove_files(resource_files, parent_folders)
+
+    if update:
+        try:
+            patch_resource_with_pcode_value(resource['id'], pcoded)
+        except Exception:
+            logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
+            raise
+
+    return pcoded, mis_pcoded
