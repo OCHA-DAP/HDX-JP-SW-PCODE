@@ -10,7 +10,7 @@ from hdx.utilities.path import temp_dir
 from hdx.utilities.retriever import Retrieve
 from hdx.utilities.useragent import UserAgent
 
-from check_location import *
+from check_location import get_global_pcodes, process_resource
 
 
 class TestCods:
@@ -27,11 +27,10 @@ class TestCods:
                 {"name": "afg", "title": "Afghanistan"},
             ]
         )
-        Country.countriesdata(use_live=False)
         return Configuration.read()
 
     @pytest.fixture(scope="class")
-    def Dataset(self):
+    def dataset(self):
         class Dataset:
             @staticmethod
             def read_from_hdx(dataset_name):
@@ -46,7 +45,7 @@ class TestCods:
         return join(fixtures, "input")
 
     def test_get_global_pcodes(self, configuration, fixtures, input_folder):
-        with temp_dir() as folder:
+        with temp_dir(folder="TestPcodeDetector") as folder:
             with Download() as downloader:
                 retriever = Retrieve(
                     downloader, folder, input_folder, folder, False, True
@@ -59,3 +58,30 @@ class TestCods:
                 assert global_pcodes == load(open(join(fixtures, "afg_col_pcodes.txt")))
                 assert global_miscodes == load(open(join(fixtures, "afg_col_miscodes.txt")))
 
+    def test_process_resource(self, configuration, fixtures, input_folder):
+        dataset = Dataset.load_from_json(join(input_folder, "test-data-for-p-code-detector.json"))
+        resources = dataset.get_resources()
+        codes = [[False, True], [True, None], [False, True], [True, None], [False, None]]
+        with temp_dir(folder="TestPcodeDetector") as folder:
+            with Download() as downloader:
+                retriever = Retrieve(
+                    downloader, folder, input_folder, folder, False, True
+                )
+                global_pcodes, global_miscodes = get_global_pcodes(
+                    configuration["global_pcodes"],
+                    retriever,
+                )
+
+                for i, resource in enumerate(resources):
+                    pcoded, mis_pcoded = process_resource(
+                        resource,
+                        dataset,
+                        global_pcodes,
+                        global_miscodes,
+                        retriever,
+                        configuration,
+                        update=False,
+                        cleanup=False,
+                    )
+                    assert pcoded == codes[i][0]
+                    assert mis_pcoded == codes[i][1]
