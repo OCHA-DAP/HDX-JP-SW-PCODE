@@ -66,26 +66,26 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
 
 
 def download_resource(resource, fileext, retriever):
-    unzip_folder = None
+    parent_folder = None
     try:
         resource_file = retriever.download_file(resource["url"])
     except:
         error = f"Unable to download file"
-        return None, unzip_folder, error
+        return None, parent_folder, error
 
     if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
         resource_files = [resource_file]
-        return resource_files, unzip_folder, None
+        return resource_files, parent_folder, None
 
     if is_zipfile(resource_file) or ".zip" in basename(resource_file):
         unzip_folder = join(retriever.temp_dir, get_uuid())
         try:
             with ZipFile(resource_file, "r") as z:
-                z.extractall(unzip_folder)
+                z.extractall(parent_folder)
         except:
             error = f"Unable to unzip resource"
-            return None, unzip_folder, error
-        resource_files = glob(join(unzip_folder, "**", f"*.{fileext}"), recursive=True)
+            return None, parent_folder, error
+        resource_files = glob(join(parent_folder, "**", f"*.{fileext}"), recursive=True)
         if len(resource_files) > 1:  # make sure to remove directories containing the actual files
             resource_files = [r for r in resource_files
                               if sum([r in rs for rs in resource_files if not rs == r]) == 0]
@@ -96,11 +96,12 @@ def download_resource(resource, fileext, retriever):
 
     elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file):
         resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
+        parent_folder = resource_file
 
     else:
         resource_files = [resource_file]
 
-    return resource_files, unzip_folder, None
+    return resource_files, parent_folder, None
 
 
 def read_downloaded_data(resource_files, fileext):
@@ -221,12 +222,14 @@ def remove_files(files=None, folder=None):
         for f in files:
             try:
                 remove(f)
-            except FileNotFoundError:
+                rmtree(f)
+            except (FileNotFoundError, NotADirectoryError, TypeError):
                 continue
     if folder:
         try:
             rmtree(folder)
-        except (FileNotFoundError, TypeError):
+            remove(folder)
+        except (FileNotFoundError, NotADirectoryError, TypeError):
             pass
 
 
@@ -267,9 +270,9 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     if pcoded is False:
         return pcoded, mis_pcoded
 
-    resource_files, unzip_folder, error = download_resource(resource, fileext, retriever)
+    resource_files, parent_folder, error = download_resource(resource, fileext, retriever)
     if not resource_files:
-        remove_files(folder=unzip_folder)
+        remove_files(folder=parent_folder)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -277,7 +280,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     contents, error = read_downloaded_data(resource_files, fileext)
 
     if len(contents) == 0:
-        remove_files(resource_files, unzip_folder)
+        remove_files(resource_files, parent_folder)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
@@ -288,7 +291,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
         pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
-        remove_files(resource_files, unzip_folder)
+        remove_files(resource_files, parent_folder)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return pcoded, mis_pcoded
@@ -307,7 +310,7 @@ def process_resource(resource, dataset, global_pcodes, global_miscodes, retrieve
     if error:
         logger.error(f"{dataset['name']}: {resource['name']}: {error}")
 
-    remove_files(resource_files, unzip_folder)
+    remove_files(resource_files, parent_folder)
 
     if update:
         try:
