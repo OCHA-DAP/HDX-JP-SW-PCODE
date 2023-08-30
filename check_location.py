@@ -5,7 +5,7 @@ from geopandas import read_file
 from glob import glob
 from os import mkdir
 from os.path import basename, dirname, join
-from pandas import isna, read_csv, read_excel
+from pandas import isna, read_excel
 from shutil import rmtree
 from zipfile import ZipFile, is_zipfile
 
@@ -113,7 +113,7 @@ def read_downloaded_data(resource_files, fileext):
                 data[get_uuid()] = parse_tabular(contents[key], fileext)
         if fileext == "csv":
             try:
-                contents = read_csv(resource_file, nrows=200, skip_blank_lines=True)
+                contents = read_file(resource_file, rows=200, ignore_geometry=True)
                 data[get_uuid()] = parse_tabular(contents, fileext)
             except:
                 error = f"Unable to read resource"
