@@ -18,7 +18,8 @@ def patch_resource_with_pcode_value(resource_id: str, pcode_value: bool) -> None
     if pcode_value is not None:
         body = {
             'id': resource_id,
-            'p_coded': pcode_value
+            'p_coded': pcode_value,
+            'batch_mode': 'KEEP_OLD',
         }
         r = requests.post(HDX_PCODE_PATCH_URL, data=json.dumps(body), headers=HEADERS)
         r.raise_for_status()
