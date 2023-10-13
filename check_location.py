@@ -23,6 +23,7 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
 
     pcodes = {"WORLD": []}
     miscodes = {"WORLD": []}
+    next(iterator)
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
