@@ -27,6 +27,9 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
+        iso2_code = Country.get_iso2_from_iso3(iso3_code)
+        if not iso2_code:
+            continue
         if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
             continue
         if iso3_code in pcodes:
@@ -39,7 +42,6 @@ def get_global_pcodes(dataset_info, downloader, locations=list()):
             miscodes[iso3_code] = [pcode]
         pcodes["WORLD"].append(pcode)
 
-        iso2_code = Country.get_iso2_from_iso3(iso3_code)
         if iso3_code not in pcode and iso2_code not in pcode:
             continue
 
