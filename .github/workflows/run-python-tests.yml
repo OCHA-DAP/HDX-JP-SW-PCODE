@@ -2,18 +2,25 @@
 
 name: Run tests
 
-on: [push, pull_request]
+on:
+  workflow_dispatch: # add run button in github
+  push:
+    branches-ignore:
+      - gh-pages
+  pull_request:
+    branches-ignore:
+      - gh-pages
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v2
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: '3.x'
     - name: Install GDAL
       run: |
         sudo apt-get update
@@ -34,11 +41,11 @@ jobs:
       run: |
         pytest --junitxml=junit/test-results.xml --cov-config .coveragerc --cov-report= --cov=.
     - name: Publish Unit Test Results
-      uses: EnricoMi/publish-unit-test-result-action@v1.6
+      uses: EnricoMi/publish-unit-test-result-action@v2
       if: always()
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        files: junit/*.xml
+        junit_files: .tox/*.xml
     - name: Publish in Coveralls
       uses: AndreMiras/coveralls-python-action@develop
       if: success()
