@@ -15,7 +15,7 @@ from hdx.utilities.path import temp_dir
 from hdx.utilities.retriever import Retrieve
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
-from check_location import get_global_pcodes, process_resource
+from check_pcodes import get_global_pcodes, process_resource
 from helper.facade import facade
 from helper.util import do_nothing_for_ever
 

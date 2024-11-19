@@ -10,7 +10,7 @@ from hdx.utilities.path import temp_dir
 from hdx.utilities.retriever import Retrieve
 from hdx.utilities.useragent import UserAgent
 
-from check_location import get_global_pcodes, process_resource
+from check_pcodes import get_global_pcodes, process_resource
 
 
 class TestCods:
