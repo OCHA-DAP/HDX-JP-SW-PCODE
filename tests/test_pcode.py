@@ -13,7 +13,7 @@ from hdx.utilities.useragent import UserAgent
 from check_pcodes import get_global_pcodes, process_resource
 
 
-class TestCods:
+class TestCheckPcodes:
     @pytest.fixture(scope="function")
     def configuration(self):
         UserAgent.set_global("test")
