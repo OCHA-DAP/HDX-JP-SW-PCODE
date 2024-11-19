@@ -68,7 +68,7 @@ def listener_main(**ignore):
                     logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
                     return False, str(exc)
 
-    event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"])
+    event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"], max_iterations=10_000)
 
 
 def main(**ignore):

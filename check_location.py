@@ -6,9 +6,8 @@ from geopandas import read_file
 from glob import glob
 from os import mkdir, remove
 from os.path import basename, dirname, join
-from pandas import isna, read_csv, read_excel
-from requests import head
-from shutil import copyfileobj, rmtree
+from pandas import isna, read_excel
+from shutil import rmtree
 from zipfile import ZipFile, is_zipfile
 
 from hdx.data.dataset import Dataset
@@ -29,7 +28,10 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
-        if locations and len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
+        iso2_code = Country.get_iso2_from_iso3(iso3_code)
+        if not iso2_code:
+            continue
+        if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
             continue
         if iso3_code in pcodes:
             pcodes[iso3_code].append(pcode)
@@ -134,7 +136,7 @@ def read_downloaded_data(resource_files, fileext):
                 data[get_uuid()] = parse_tabular(contents[key], fileext)
         if fileext == "csv":
             try:
-                contents = read_csv(resource_file, nrows=200, skip_blank_lines=True)
+                contents = read_file(resource_file, rows=200, ignore_geometry=True)
                 data[get_uuid()] = parse_tabular(contents, fileext)
             except:
                 error = f"Unable to read resource"
