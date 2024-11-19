@@ -7,11 +7,12 @@ from glob import glob
 from os import mkdir, remove
 from os.path import basename, dirname, join
 from pandas import isna, read_excel
-from shutil import rmtree
+from requests import head
+from shutil import copyfileobj, rmtree
 from zipfile import ZipFile, is_zipfile
 
 from hdx.data.dataset import Dataset
-from hdx.location.country import Country
+from hdx.utilities.dictandlist import dict_of_lists_add
 from hdx.utilities.uuid import get_uuid
 from helper.ckan import patch_resource_with_pcode_value
 
@@ -24,48 +25,16 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
     headers, iterator = retriever.get_tabular_rows(resource[0]["url"], dict_form=True)
 
     pcodes = {"WORLD": []}
-    miscodes = {"WORLD": []}
     next(iterator)
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
-        iso2_code = Country.get_iso2_from_iso3(iso3_code)
-        if not iso2_code:
-            continue
         if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
             continue
-        if iso3_code in pcodes:
-            pcodes[iso3_code].append(pcode)
-        else:
-            pcodes[iso3_code] = [pcode]
-        if iso3_code in miscodes:
-            miscodes[iso3_code].append(pcode)
-        else:
-            miscodes[iso3_code] = [pcode]
+        dict_of_lists_add(pcodes, iso3_code, pcode)
         pcodes["WORLD"].append(pcode)
 
-        if iso3_code not in pcode and iso2_code not in pcode:
-            continue
-
-        pcode_no0 = pcode.replace("0", "")
-        miscodes[iso3_code].append(pcode_no0)
-        miscodes["WORLD"].append(pcode_no0)
-
-        if iso3_code in pcode_no0:
-            miscode = pcode_no0.replace(iso3_code, iso2_code)
-            miscodes[iso3_code].append(miscode)
-            miscodes["WORLD"].append(miscode)
-            continue
-        if iso2_code in pcode_no0:
-            miscode = pcode_no0.replace(iso2_code, iso3_code)
-            miscodes[iso3_code].append(miscode)
-            miscodes["WORLD"].append(miscode)
-
-    for iso in miscodes:
-        miscodes[iso] = list(set(miscodes[iso]))
-        miscodes[iso].sort()
-
-    return pcodes, miscodes
+    return pcodes
 
 
 def download_resource(resource, fileext, retriever):
@@ -206,7 +175,7 @@ def parse_tabular(df, fileext):
     return df
 
 
-def check_pcoded(df, pcodes, miscodes=False):
+def check_pcoded(df, pcodes):
     pcoded = None
     header_exp = "((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
 
@@ -221,8 +190,6 @@ def check_pcoded(df, pcodes, miscodes=False):
         column = column[~column.isin(["NA", "NAN", "NONE", "NULL", ""])]
         if len(column) == 0:
             continue
-        if miscodes:
-            column = column.str.replace("0", "")
         matches = sum(column.isin(pcodes))
         pcnt_match = matches / len(column)
         if pcnt_match >= 0.9:
@@ -250,14 +217,12 @@ def remove_files(files=None, folders=None):
 
 
 def process_resource(
-        resource, dataset, global_pcodes, global_miscodes, retriever, configuration, update=True, cleanup=True
+        resource, dataset, global_pcodes, retriever, configuration, update=True, cleanup=True
 ):
     pcoded = None
-    mis_pcoded = None
 
     locations = dataset.get_location_iso3s()
     pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
-    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
 
     filetype = resource.get_file_type()
     fileext = filetype
@@ -286,7 +251,7 @@ def process_resource(
             pcoded = False
 
     if pcoded is False:
-        return pcoded, mis_pcoded
+        return pcoded
 
     resource_files, parent_folders, error = download_resource(resource, fileext, retriever)
     if not resource_files:
@@ -315,18 +280,10 @@ def process_resource(
             remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
-        return pcoded, mis_pcoded
-
-    for key in contents:
-        if mis_pcoded:
-            break
-        mis_pcoded = check_pcoded(contents[key], miscodes, miscodes=True)
+        return pcoded
 
     if not error and pcoded is None:
         pcoded = False
-
-    if mis_pcoded:
-        logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
 
     if error:
         logger.error(f"{dataset['name']}: {resource['name']}: {error}")
@@ -341,4 +298,4 @@ def process_resource(
             logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
 
-    return pcoded, mis_pcoded
+    return pcoded

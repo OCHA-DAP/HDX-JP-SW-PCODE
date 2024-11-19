@@ -38,7 +38,7 @@ def listener_main(**ignore):
             retriever = Retrieve(
                 downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
             )
-            global_pcodes, global_miscodes = get_global_pcodes(
+            global_pcodes = get_global_pcodes(
                 configuration["global_pcodes"],
                 retriever,
             )
@@ -59,7 +59,7 @@ def listener_main(**ignore):
                         for resource in dataset.get_resources():
                             if resource["id"] != resource_id:
                                 continue
-                            process_resource(resource, dataset, global_pcodes, global_miscodes, retriever, configuration)
+                            process_resource(resource, dataset, global_pcodes, retriever, configuration)
                             end_time = datetime.datetime.now()
                             elapsed_time = end_time - start_time
                             logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
@@ -80,7 +80,7 @@ def main(**ignore):
             retriever = Retrieve(
                 downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
             )
-            global_pcodes, global_miscodes = get_global_pcodes(
+            global_pcodes = get_global_pcodes(
                 configuration["global_pcodes"],
                 retriever,
             )
@@ -88,16 +88,15 @@ def main(**ignore):
             for dataset in datasets:
                 resources = dataset.get_resources()
                 for resource in resources:
-                    pcoded, mis_pcoded = process_resource(
+                    pcoded = process_resource(
                         resource,
                         dataset,
                         global_pcodes,
-                        global_miscodes,
                         retriever,
                         configuration,
                         update=False,
                     )
-                    logger.info(f"{resource['name']}: {pcoded}, {mis_pcoded}")
+                    logger.info(f"{resource['name']}: {pcoded}")
 
 
 if __name__ == "__main__":
