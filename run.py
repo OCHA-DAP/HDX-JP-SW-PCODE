@@ -10,6 +10,7 @@ from os.path import join
 
 from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
+from hdx.data.resource import Resource
 from hdx.utilities.downloader import Download
 from hdx.utilities.path import temp_dir
 from hdx.utilities.retriever import Retrieve
@@ -56,13 +57,11 @@ def listener_main(**ignore):
                     resource_id = event.get("resource_id")
                     if dataset_id and resource_id:
                         dataset = Dataset.read_from_hdx(dataset_id)
-                        for resource in dataset.get_resources():
-                            if resource["id"] != resource_id:
-                                continue
-                            process_resource(resource, dataset, global_pcodes, retriever, configuration)
-                            end_time = datetime.datetime.now()
-                            elapsed_time = end_time - start_time
-                            logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
+                        resource = Resource.read_from_hdx(resource_id)
+                        process_resource(resource, dataset, global_pcodes, retriever, configuration)
+                        end_time = datetime.datetime.now()
+                        elapsed_time = end_time - start_time
+                        logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
                     return True, "Success"
                 except Exception as exc:
                     logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
