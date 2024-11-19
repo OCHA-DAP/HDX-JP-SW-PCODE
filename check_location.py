@@ -6,20 +6,23 @@ from geopandas import read_file
 from glob import glob
 from os import mkdir, remove
 from os.path import basename, dirname, join
-from pandas import isna, read_excel
+from pandas import DataFrame, isna, read_excel
 from requests import head
 from shutil import copyfileobj, rmtree
+from typing import Dict, List, Optional, Tuple
 from zipfile import ZipFile, is_zipfile
 
 from hdx.data.dataset import Dataset
+from hdx.data.resource import Resource
 from hdx.utilities.dictandlist import dict_of_lists_add
+from hdx.utilities.retriever import Retrieve
 from hdx.utilities.uuid import get_uuid
 from helper.ckan import patch_resource_with_pcode_value
 
 logger = logging.getLogger(__name__)
 
 
-def get_global_pcodes(dataset_info, retriever, locations=None):
+def get_global_pcodes(dataset_info: Dict, retriever: Retrieve, locations: Optional[List[str]] = None) -> Dict:
     dataset = Dataset.read_from_hdx(dataset_info["dataset"])
     resource = [r for r in dataset.get_resources() if r["name"] == dataset_info["name"]]
     headers, iterator = retriever.get_tabular_rows(resource[0]["url"], dict_form=True)
@@ -29,7 +32,7 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
-        if len(locations) > 0 and iso3_code not in locations and "WORLD" not in locations:
+        if locations and iso3_code not in locations and "WORLD" not in locations:
             continue
         dict_of_lists_add(pcodes, iso3_code, pcode)
         pcodes["WORLD"].append(pcode)
@@ -37,7 +40,7 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
     return pcodes
 
 
-def download_resource(resource, fileext, retriever):
+def download_resource(resource: Resource, fileext: str, retriever: Retrieve) -> Tuple[List or None, str or None, str or None]:
     try:
         resource_file = retriever.download_file(resource["url"])
     except:
@@ -87,7 +90,7 @@ def download_resource(resource, fileext, retriever):
     return resource_files, parent_folders, None
 
 
-def read_downloaded_data(resource_files, fileext):
+def read_downloaded_data(resource_files: List[str], fileext: str) -> Tuple[Dict, str]:
     data = dict()
     error = None
     for resource_file in resource_files:
@@ -130,7 +133,7 @@ def read_downloaded_data(resource_files, fileext):
     return data, error
 
 
-def parse_tabular(df, fileext):
+def parse_tabular(df: DataFrame, fileext: str) -> DataFrame:
     df = df.dropna(how="all", axis=0).dropna(how="all", axis=1).reset_index(drop=True)
     df.columns = [str(c) for c in df.columns]
     if all([bool(re.match("Unnamed.*", c)) for c in df.columns]):  # if all columns are unnamed, move down a row
@@ -175,7 +178,7 @@ def parse_tabular(df, fileext):
     return df
 
 
-def check_pcoded(df, pcodes):
+def check_pcoded(df: DataFrame, pcodes: List[str]) -> bool:
     pcoded = None
     header_exp = "((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
 
@@ -198,7 +201,7 @@ def check_pcoded(df, pcodes):
     return pcoded
 
 
-def remove_files(files=None, folders=None):
+def remove_files(files: List[str] = None, folders: List[str] = None) -> None:
     if files:
         to_delete = files
         if folders:
@@ -217,8 +220,14 @@ def remove_files(files=None, folders=None):
 
 
 def process_resource(
-        resource, dataset, global_pcodes, retriever, configuration, update=True, cleanup=True
-):
+    resource: Resource,
+    dataset: Dataset,
+    global_pcodes: Dict,
+    retriever: Retrieve,
+    configuration: Dict,
+    update: Optional[bool] = True,
+    cleanup: Optional[bool] = True,
+) -> bool or None:
     pcoded = None
 
     locations = dataset.get_location_iso3s()
