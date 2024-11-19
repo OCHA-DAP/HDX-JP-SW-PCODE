@@ -6,9 +6,9 @@ global_pcodes:
 
 allowed_filetypes:
   - "csv"
-  - "geodatabase"
+  - "gdb"
   - "geojson"
-  - "geopackage"
+  - "gpkg"
   - "json"
   - "shp"
   - "topojson"

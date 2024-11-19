@@ -40,14 +40,14 @@ def get_global_pcodes(dataset_info: Dict, retriever: Retrieve, locations: Option
     return pcodes
 
 
-def download_resource(resource: Resource, fileext: str, retriever: Retrieve) -> Tuple[List or None, str or None, str or None]:
+def download_resource(resource: Resource, file_ext: str, retriever: Retrieve) -> Tuple[List or None, str or None, str or None]:
     try:
         resource_file = retriever.download_file(resource["url"])
     except:
         error = f"Unable to download file"
         return None, None, error
 
-    if fileext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
+    if file_ext in ["xls", "xlsx"] and ".zip" not in basename(resource_file):
         resource_files = [resource_file]
         return resource_files, None, None
 
@@ -70,16 +70,16 @@ def download_resource(resource: Resource, fileext: str, retriever: Retrieve) -> 
             except:
                 error = f"Unable to unzip resource"
                 return None, parent_folders, error
-        resource_files = glob(join(parent_folder, "**", f"*.{fileext}"), recursive=True)
+        resource_files = glob(join(parent_folder, "**", f"*.{file_ext}"), recursive=True)
         if len(resource_files) > 1:  # make sure to remove directories containing the actual files
             resource_files = [r for r in resource_files
                               if sum([r in rs for rs in resource_files if not rs == r]) == 0]
-        if fileext == "xlsx" and len(resource_files) == 0:
+        if file_ext == "xlsx" and len(resource_files) == 0:
             resource_files = [resource_file]
-        if fileext in ["gdb", "gpkg"]:
+        if file_ext in ["gdb", "gpkg"]:
             resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
 
-    elif fileext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
+    elif file_ext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
         resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
         parent_folders = [resource_file]
 
@@ -90,11 +90,11 @@ def download_resource(resource: Resource, fileext: str, retriever: Retrieve) -> 
     return resource_files, parent_folders, None
 
 
-def read_downloaded_data(resource_files: List[str], fileext: str) -> Tuple[Dict, str]:
+def read_downloaded_data(resource_files: List[str], file_ext: str) -> Tuple[Dict, str]:
     data = dict()
     error = None
     for resource_file in resource_files:
-        if fileext in ["xlsx", "xls"]:
+        if file_ext in ["xlsx", "xls"]:
             try:
                 contents = read_excel(
                     resource_file, sheet_name=None, nrows=200
@@ -105,15 +105,15 @@ def read_downloaded_data(resource_files: List[str], fileext: str) -> Tuple[Dict,
             for key in contents:
                 if contents[key].empty:
                     continue
-                data[get_uuid()] = parse_tabular(contents[key], fileext)
-        if fileext == "csv":
+                data[get_uuid()] = parse_tabular(contents[key], file_ext)
+        if file_ext == "csv":
             try:
                 contents = read_file(resource_file, rows=200, ignore_geometry=True)
-                data[get_uuid()] = parse_tabular(contents, fileext)
+                data[get_uuid()] = parse_tabular(contents, file_ext)
             except:
                 error = f"Unable to read resource"
                 continue
-        if fileext in ["geojson", "json", "shp", "topojson"]:
+        if file_ext in ["geojson", "json", "shp", "topojson"]:
             try:
                 data = {
                     get_uuid(): read_file(resource_file, rows=200)
@@ -121,7 +121,7 @@ def read_downloaded_data(resource_files: List[str], fileext: str) -> Tuple[Dict,
             except:
                 error = f"Unable to read resource"
                 continue
-        if fileext in ["gdb", "gpkg"]:
+        if file_ext in ["gdb", "gpkg"]:
             try:
                 data = {
                     get_uuid(): read_file(dirname(resource_file), layer=basename(resource_file), rows=200)
@@ -133,7 +133,7 @@ def read_downloaded_data(resource_files: List[str], fileext: str) -> Tuple[Dict,
     return data, error
 
 
-def parse_tabular(df: DataFrame, fileext: str) -> DataFrame:
+def parse_tabular(df: DataFrame, file_ext: str) -> DataFrame:
     df = df.dropna(how="all", axis=0).dropna(how="all", axis=1).reset_index(drop=True)
     df.columns = [str(c) for c in df.columns]
     if all([bool(re.match("Unnamed.*", c)) for c in df.columns]):  # if all columns are unnamed, move down a row
@@ -160,7 +160,7 @@ def parse_tabular(df: DataFrame, fileext: str) -> DataFrame:
         df.columns = columns
         df = df.drop(index=range(hxlrow + 1)).reset_index(drop=True)
         return df
-    if fileext == "csv" and not hxlrow:  # assume first row of csv is header if there are no hxl tags
+    if file_ext == "csv" and not hxlrow:  # assume first row of csv is header if there are no hxl tags
         return df
     columns = []
     datarow = 3
@@ -233,17 +233,16 @@ def process_resource(
     locations = dataset.get_location_iso3s()
     pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
 
-    filetype = resource.get_file_type()
-    fileext = filetype
-    if fileext == "geodatabase":
-        fileext = "gdb"
-    if fileext == "geopackage":
-        fileext = "gpkg"
+    file_ext = resource.get_format()
+    if file_ext == "geodatabase":
+        file_ext = "gdb"
+    if file_ext == "geopackage":
+        file_ext = "gpkg"
 
     if dataset.get_organization()["name"] in configuration["org_exceptions"]:
         pcoded = False
 
-    if filetype.lower() not in configuration["allowed_filetypes"]:
+    if file_ext.lower() not in configuration["allowed_filetypes"]:
         pcoded = False
 
     if pcoded is None:
@@ -262,7 +261,7 @@ def process_resource(
     if pcoded is False:
         return pcoded
 
-    resource_files, parent_folders, error = download_resource(resource, fileext, retriever)
+    resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
     if not resource_files:
         if cleanup:
             remove_files(folders=parent_folders)
@@ -270,7 +269,7 @@ def process_resource(
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None, None
 
-    contents, error = read_downloaded_data(resource_files, fileext)
+    contents, error = read_downloaded_data(resource_files, file_ext)
 
     if len(contents) == 0:
         if cleanup:
