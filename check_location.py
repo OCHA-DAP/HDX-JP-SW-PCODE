@@ -25,6 +25,7 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
 
     pcodes = {"WORLD": []}
     miscodes = {"WORLD": []}
+    next(iterator)
     for row in iterator:
         pcode = row[dataset_info["p-code"]]
         iso3_code = row[dataset_info["admin"]]
@@ -43,7 +44,6 @@ def get_global_pcodes(dataset_info, retriever, locations=None):
             miscodes[iso3_code] = [pcode]
         pcodes["WORLD"].append(pcode)
 
-        iso2_code = Country.get_iso2_from_iso3(iso3_code)
         if iso3_code not in pcode and iso2_code not in pcode:
             continue
 
