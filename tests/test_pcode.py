@@ -60,7 +60,7 @@ class TestCheckPcodes:
     def test_process_resource(self, configuration, fixtures, input_folder):
         dataset = Dataset.load_from_json(join(input_folder, "test-data-for-p-code-detector.json"))
         resources = dataset.get_resources()
-        codes = [[False, True], [True, None], [False, True], [True, None], [False, None]]
+        codes = [False, True, False, True, False]
         with temp_dir(folder="TestPcodeDetector") as folder:
             with Download() as downloader:
                 retriever = Retrieve(
@@ -81,4 +81,4 @@ class TestCheckPcodes:
                         update=False,
                         cleanup=False,
                     )
-                    assert pcoded == codes[i][0]
+                    assert pcoded == codes[i]
