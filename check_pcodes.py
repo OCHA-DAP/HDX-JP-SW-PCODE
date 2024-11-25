@@ -6,7 +6,7 @@ from geopandas import read_file
 from glob import glob
 from os import mkdir, remove
 from os.path import basename, dirname, join
-from pandas import DataFrame, isna, read_excel
+from pandas import DataFrame, isna, read_csv, read_excel
 from requests import head
 from shutil import copyfileobj, rmtree
 from typing import Dict, List, Optional, Tuple
@@ -90,14 +90,14 @@ def download_resource(resource: Resource, file_ext: str, retriever: Retrieve) ->
     return resource_files, parent_folders, None
 
 
-def read_downloaded_data(resource_files: List[str], file_ext: str) -> Tuple[Dict, str]:
+def read_downloaded_data(resource_files: List[str], file_ext: str, nrows: int) -> Tuple[Dict, str]:
     data = dict()
     error = None
     for resource_file in resource_files:
         if file_ext in ["xlsx", "xls"]:
             try:
                 contents = read_excel(
-                    resource_file, sheet_name=None, nrows=200
+                    resource_file, sheet_name=None, nrows=nrows
                 )
             except:
                 error = f"Unable to read resource"
@@ -108,15 +108,20 @@ def read_downloaded_data(resource_files: List[str], file_ext: str) -> Tuple[Dict
                 data[get_uuid()] = parse_tabular(contents[key], file_ext)
         if file_ext == "csv":
             try:
-                contents = read_file(resource_file, rows=200, ignore_geometry=True)
-                data[get_uuid()] = parse_tabular(contents, file_ext)
+                contents = read_csv(resource_file, nrows=nrows, skip_blank_lines=True, on_bad_lines="skip")
             except:
-                error = f"Unable to read resource"
-                continue
+                try:
+                    contents = read_csv(
+                        resource_file, nrows=nrows, skip_blank_lines=True, on_bad_lines="skip", encoding="latin-1"
+                    )
+                except:
+                    error = f"Unable to read resource"
+                    continue
+            data[get_uuid()] = parse_tabular(contents, file_ext)
         if file_ext in ["geojson", "json", "shp", "topojson"]:
             try:
                 data = {
-                    get_uuid(): read_file(resource_file, rows=200)
+                    get_uuid(): read_file(resource_file, rows=nrows)
                 }
             except:
                 error = f"Unable to read resource"
@@ -124,7 +129,7 @@ def read_downloaded_data(resource_files: List[str], file_ext: str) -> Tuple[Dict
         if file_ext in ["gdb", "gpkg"]:
             try:
                 data = {
-                    get_uuid(): read_file(dirname(resource_file), layer=basename(resource_file), rows=200)
+                    get_uuid(): read_file(dirname(resource_file), layer=basename(resource_file), rows=nrows)
                 }
             except:
                 error = f"Unable to read resource"
@@ -178,7 +183,7 @@ def parse_tabular(df: DataFrame, file_ext: str) -> DataFrame:
     return df
 
 
-def check_pcoded(df: DataFrame, pcodes: List[str]) -> bool:
+def check_pcoded(df: DataFrame, pcodes: List[str], pcnt_match: float) -> bool:
     pcoded = None
     header_exp = "((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
 
@@ -195,7 +200,7 @@ def check_pcoded(df: DataFrame, pcodes: List[str]) -> bool:
             continue
         matches = sum(column.isin(pcodes))
         pcnt_match = matches / len(column)
-        if pcnt_match >= 0.9:
+        if pcnt_match >= pcnt_match:
             pcoded = True
 
     return pcoded
@@ -268,7 +273,7 @@ def process_resource(
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
         return None
 
-    contents, error = read_downloaded_data(resource_files, file_ext)
+    contents, error = read_downloaded_data(resource_files, file_ext, configuration["number_of_rows"])
 
     if len(contents) == 0:
         if cleanup:
@@ -279,7 +284,7 @@ def process_resource(
 
     for key in contents:
         if not pcoded:
-            pcoded = check_pcoded(contents[key], pcodes)
+            pcoded = check_pcoded(contents[key], pcodes, configuration["percent_match"])
 
     if pcoded:
         if cleanup:

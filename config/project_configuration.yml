@@ -15,6 +15,10 @@ allowed_filetypes:
   - "xls"
   - "xlsx"
 
+number_of_rows: 200
+
+percent_match: 0.9
+
 resource_size: 1073741824
 
 org_exceptions:
