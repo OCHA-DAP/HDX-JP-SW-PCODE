@@ -70,6 +70,8 @@ class TestCheckPcodes:
                     configuration["global_pcodes"],
                     retriever,
                 )
+                assert len(global_pcodes) == 158
+                assert len(global_pcodes["AFG"]) == 435
 
                 for i, resource in enumerate(resources):
                     pcoded = process_resource(
