@@ -6,14 +6,18 @@ global_pcodes:
 
 allowed_filetypes:
   - "csv"
-  - "geodatabase"
+  - "gdb"
   - "geojson"
-  - "geopackage"
+  - "gpkg"
   - "json"
   - "shp"
   - "topojson"
   - "xls"
   - "xlsx"
+
+number_of_rows: 200
+
+percent_match: 0.9
 
 resource_size: 1073741824
 

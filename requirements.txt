@@ -1,5 +1,5 @@
 -r initial-requirements.txt
-hdx-python-api~=5.9.7
+hdx-python-api~=6.3.5
 requests~=2.31.0
 python-json-logger~=2.0.7
 git+https://github.com/OCHA-DAP/hdx-redis-lib.git@0.3.2

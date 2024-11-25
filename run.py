@@ -4,20 +4,20 @@ import logging.config
 logging.config.fileConfig("logging.conf")
 
 import datetime
-import requests
 from json import dumps
 from os import getenv
 from os.path import join
 
 from hdx.api.configuration import Configuration
 from hdx.data.dataset import Dataset
+from hdx.data.resource import Resource
 from hdx.utilities.downloader import Download
 from hdx.utilities.path import temp_dir
+from hdx.utilities.retriever import Retrieve
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
-from check_location import check_location, get_global_pcodes
+from check_pcodes import get_global_pcodes, process_resource
 from helper.facade import facade
-from helper.ckan import patch_resource_with_pcode_value
 from helper.util import do_nothing_for_ever
 
 logger = logging.getLogger(__name__)
@@ -34,35 +34,38 @@ def listener_main(**ignore):
 
     configuration = Configuration.read()
 
-    with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
-        global_pcodes, global_miscodes = get_global_pcodes(
-            configuration["global_pcodes"],
-            downloader,
-        )
+    with temp_dir(folder="TempPCodeDetector") as temp_folder:
+        with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
+            retriever = Retrieve(
+                downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
+            )
+            global_pcodes = get_global_pcodes(
+                configuration["global_pcodes"],
+                retriever,
+            )
 
     def event_processor(event):
         start_time = datetime.datetime.now()
-        with temp_dir(folder="TempLocationExploration") as temp_folder:
-            try:
-                logger.info(f"Received event: {dumps(event, ensure_ascii=False, indent=4)}")
-                dataset_id = event.get("dataset_id")
-                resource_id = event.get("resource_id")
-                if dataset_id and resource_id:
-                    dataset = Dataset.read_from_hdx(dataset_id)
-                    locations = dataset.get_location_iso3s()
-                    pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
-                    miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
-                    for resource in dataset.get_resources():
-                        if resource["id"] != resource_id:
-                            continue
-                        _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration)
+        with temp_dir(folder="TempPCodeDetector") as temp_folder:
+            with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
+                retriever = Retrieve(
+                    downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
+                )
+                try:
+                    logger.info(f"Received event: {dumps(event, ensure_ascii=False, indent=4)}")
+                    dataset_id = event.get("dataset_id")
+                    resource_id = event.get("resource_id")
+                    if dataset_id and resource_id:
+                        dataset = Dataset.read_from_hdx(dataset_id)
+                        resource = Resource.read_from_hdx(resource_id)
+                        process_resource(resource, dataset, global_pcodes, retriever, configuration)
                         end_time = datetime.datetime.now()
                         elapsed_time = end_time - start_time
                         logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
-                return True, "Success"
-            except Exception as exc:
-                logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
-                return False, str(exc)
+                    return True, "Success"
+                except Exception as exc:
+                    logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
+                    return False, str(exc)
 
     event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"], max_iterations=10_000)
 
@@ -71,59 +74,29 @@ def main(**ignore):
 
     configuration = Configuration.read()
 
-    with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
-        global_pcodes, global_miscodes = get_global_pcodes(
-            configuration["global_pcodes"],
-            downloader,
-        )
-
-    with temp_dir(folder="TempLocationExploration") as temp_folder:
-        datasets = Dataset.get_all_datasets(rows=100)
-        for dataset in datasets:
-            locations = dataset.get_location_iso3s()
-            pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
-            miscodes = [pcode for iso in global_miscodes for pcode in global_miscodes[iso] if iso in locations]
-            resources = dataset.get_resources()
-            for resource in resources:
-                _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration)
-
-
-def _process_resource(resource, dataset, pcodes, miscodes, temp_folder, configuration):
-    pcoded = None
-
-    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
-        pcoded = False
-
-    if resource.get_file_type().lower() not in configuration["allowed_filetypes"]:
-        pcoded = False
-
-    if pcoded is None:
-        size = resource["size"]
-        if (size is None or size == 0) and resource["resource_type"] == "api":
-            try:
-                resource_info = requests.head(resource["url"])
-                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
-                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
-            except:
-                size = configuration["resource_size"]
-
-        if size >= configuration["resource_size"]:
-            pcoded = False
-
-    if pcoded is None:
-        pcoded, mis_pcoded, error = check_location(resource, pcodes, miscodes, temp_folder)
-        if mis_pcoded:
-            logger.warning(f"{dataset['name']}: {resource['name']}: may be mis-pcoded")
-
-        if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
-
-    if pcoded is not None:
-        try:
-            patch_resource_with_pcode_value(resource['id'], pcoded)
-        except Exception:
-            logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
-            raise
+    with temp_dir(folder="TempPCodeDetector") as temp_folder:
+        with Download(rate_limit={"calls": 1, "period": 0.1}) as downloader:
+            retriever = Retrieve(
+                downloader, temp_folder, "saved_data", temp_folder, save=False, use_saved=False
+            )
+            global_pcodes = get_global_pcodes(
+                configuration["global_pcodes"],
+                retriever,
+            )
+            datasets = Dataset.get_all_datasets(rows=1000)
+            for dataset in datasets:
+                resources = dataset.get_resources()
+                for resource in resources:
+                    pcoded = process_resource(
+                        resource,
+                        dataset,
+                        global_pcodes,
+                        retriever,
+                        configuration,
+                        update=False,
+                        cleanup=True,
+                    )
+                    logger.info(f"{dataset['name']}: {resource['name']}: {pcoded}")
 
 
 if __name__ == "__main__":

@@ -25,5 +25,3 @@ def patch_resource_with_pcode_value(resource_id: str, pcode_value: bool) -> None
         r.raise_for_status()
     else:
         logger.warning(f'Did not update resource {resource_id} because calculated value would be None')
-
-
