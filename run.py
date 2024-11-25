@@ -83,8 +83,9 @@ def main(**ignore):
                 configuration["global_pcodes"],
                 retriever,
             )
-            datasets = Dataset.get_all_datasets(rows=100)
+            datasets = Dataset.get_all_datasets(rows=1000)
             for dataset in datasets:
+                logger.info(f"Processing dataset {dataset['name']}")
                 resources = dataset.get_resources()
                 for resource in resources:
                     pcoded = process_resource(
