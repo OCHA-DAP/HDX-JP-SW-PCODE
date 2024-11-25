@@ -230,6 +230,9 @@ def process_resource(
 ) -> bool or None:
     pcoded = None
 
+    if dataset["archived"]:
+        return None
+
     locations = dataset.get_location_iso3s()
     pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
 
@@ -259,7 +262,7 @@ def process_resource(
 
     resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
     if not resource_files:
-        if cleanup:
+        if cleanup and parent_folders:
             remove_files(folders=parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
