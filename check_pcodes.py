@@ -240,26 +240,22 @@ def process_resource(
         file_ext = "gpkg"
 
     if dataset.get_organization()["name"] in configuration["org_exceptions"]:
-        pcoded = False
+        return False
 
     if file_ext.lower() not in configuration["allowed_filetypes"]:
-        pcoded = False
+        return None
 
-    if pcoded is None:
-        size = resource["size"]
-        if (size is None or size == 0) and resource["resource_type"] == "api":
-            try:
-                resource_info = head(resource["url"])
-                # if size cannot be determined, set to the limit set in configuration so the resource is excluded
-                size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
-            except:
-                size = configuration["resource_size"]
+    size = resource["size"]
+    if (size is None or size == 0) and resource["resource_type"] == "api":
+        try:
+            resource_info = head(resource["url"])
+            # if size cannot be determined, set to the limit set in configuration so the resource is excluded
+            size = int(resource_info.headers.get("Content-Length", configuration["resource_size"]))
+        except:
+            size = configuration["resource_size"]
 
-        if size >= configuration["resource_size"]:
-            pcoded = False
-
-    if pcoded is False:
-        return pcoded
+    if size >= configuration["resource_size"]:
+        return None
 
     resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
     if not resource_files:
@@ -267,7 +263,7 @@ def process_resource(
             remove_files(folders=parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
-        return None, None
+        return None
 
     contents, error = read_downloaded_data(resource_files, file_ext)
 
@@ -276,12 +272,11 @@ def process_resource(
             remove_files(resource_files, parent_folders)
         if error:
             logger.error(f"{dataset['name']}: {resource['name']}: {error}")
-        return None, None
+        return None
 
     for key in contents:
-        if pcoded:
-            break
-        pcoded = check_pcoded(contents[key], pcodes)
+        if not pcoded:
+            pcoded = check_pcoded(contents[key], pcodes)
 
     if pcoded:
         if cleanup:
@@ -301,7 +296,7 @@ def process_resource(
 
     if update:
         try:
-            patch_resource_with_pcode_value(resource['id'], pcoded)
+            patch_resource_with_pcode_value(resource["id"], pcoded)
         except Exception:
             logger.exception(f"Could not update resource {resource['id']} in dataset {dataset['name']}")
             raise
