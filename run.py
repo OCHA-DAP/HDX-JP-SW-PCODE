@@ -85,7 +85,6 @@ def main(**ignore):
             )
             datasets = Dataset.get_all_datasets(rows=1000)
             for dataset in datasets:
-                logger.info(f"Processing dataset {dataset['name']}")
                 resources = dataset.get_resources()
                 for resource in resources:
                     pcoded = process_resource(
@@ -97,7 +96,7 @@ def main(**ignore):
                         update=False,
                         cleanup=True,
                     )
-                    logger.info(f"{resource['name']}: {pcoded}")
+                    logger.info(f"{dataset['name']}: {resource['name']}: {pcoded}")
 
 
 if __name__ == "__main__":
