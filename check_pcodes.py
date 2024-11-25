@@ -183,7 +183,7 @@ def parse_tabular(df: DataFrame, file_ext: str) -> DataFrame:
     return df
 
 
-def check_pcoded(df: DataFrame, pcodes: List[str], pcnt_match: float) -> bool:
+def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
     pcoded = None
     header_exp = "((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
 
@@ -200,7 +200,7 @@ def check_pcoded(df: DataFrame, pcodes: List[str], pcnt_match: float) -> bool:
             continue
         matches = sum(column.isin(pcodes))
         pcnt_match = matches / len(column)
-        if pcnt_match >= pcnt_match:
+        if pcnt_match >= match_cutoff:
             pcoded = True
 
     return pcoded
