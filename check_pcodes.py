@@ -211,11 +211,11 @@ def remove_files(files: List[str] = None, folders: List[str] = None) -> None:
     for f in to_delete:
         try:
             remove(f)
-        except (FileNotFoundError, NotADirectoryError, TypeError):
+        except (FileNotFoundError, NotADirectoryError, PermissionError, TypeError):
             pass
         try:
             rmtree(f)
-        except (FileNotFoundError, NotADirectoryError, TypeError):
+        except (FileNotFoundError, NotADirectoryError, PermissionError, TypeError):
             pass
 
 
@@ -226,7 +226,7 @@ def process_resource(
     retriever: Retrieve,
     configuration: Dict,
     update: Optional[bool] = True,
-    cleanup: Optional[bool] = True,
+    cleanup: Optional[bool] = False,
 ) -> bool or None:
     pcoded = None
 

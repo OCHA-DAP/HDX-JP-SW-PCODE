@@ -95,6 +95,7 @@ def main(**ignore):
                         retriever,
                         configuration,
                         update=False,
+                        cleanup=True,
                     )
                     logger.info(f"{resource['name']}: {pcoded}")
 

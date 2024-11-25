@@ -81,6 +81,5 @@ class TestCheckPcodes:
                         retriever,
                         configuration,
                         update=False,
-                        cleanup=False,
                     )
                     assert pcoded == codes[i]
