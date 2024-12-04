@@ -58,7 +58,7 @@ def listener_main(**ignore):
                     if dataset_id and resource_id:
                         dataset = Dataset.read_from_hdx(dataset_id)
                         resource = Resource.read_from_hdx(resource_id)
-                        process_resource(resource, dataset, global_pcodes, retriever, configuration)
+                        process_resource(resource, dataset, global_pcodes, retriever, configuration, update=True, flag=True)
                         end_time = datetime.datetime.now()
                         elapsed_time = end_time - start_time
                         logger.info(f"Finished processing resource {resource['name']}, {resource['id']} in {str(elapsed_time)}")
@@ -93,7 +93,6 @@ def main(**ignore):
                         global_pcodes,
                         retriever,
                         configuration,
-                        update=False,
                         cleanup=True,
                     )
                     logger.info(f"{dataset['name']}: {resource['name']}: {pcoded}")
