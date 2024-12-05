@@ -80,6 +80,5 @@ class TestCheckPcodes:
                         global_pcodes,
                         retriever,
                         configuration,
-                        update=False,
                     )
                     assert pcoded == codes[i]
