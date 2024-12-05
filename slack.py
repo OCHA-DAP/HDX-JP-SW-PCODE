@@ -10,12 +10,12 @@ SLACK_CLIENT: "SlackClientWrapper" = None
 
 class SlackClientWrapper():
     def __init__(self) -> None:
-        self.slack_channel = os.getenv('HDX_SLACK_NOTIFICATION_CHANNEL')
+        self.slack_channel = os.getenv('HDX_PCODE_SLACK_NOTIFICATION_CHANNEL')
         # self.slack_channel = 'test-channel'
 
 
         self.slack_client = None
-        token = os.getenv('HDX_SLACK_NOTIFICATION_ACCESS_TOKEN')
+        token = os.getenv('HDX_PCODE_SLACK_NOTIFICATION_ACCESS_TOKEN')
         if token:
             self.slack_client = slack_sdk.WebClient(token=token)
             logger.debug('Slack client initialized')
