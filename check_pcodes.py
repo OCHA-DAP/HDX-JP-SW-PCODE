@@ -18,6 +18,7 @@ from hdx.utilities.dictandlist import dict_of_lists_add
 from hdx.utilities.retriever import Retrieve
 from hdx.utilities.uuid import get_uuid
 from helper.ckan import patch_resource_with_pcode_value
+from slack import get_slack_client
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ def remove_files(files: List[str] = None, folders: List[str] = None) -> None:
 
 
 def send_to_slack(message: str) -> None:
-    return
+    get_slack_client().post_to_slack_channel(message)
 
 
 def process_resource(

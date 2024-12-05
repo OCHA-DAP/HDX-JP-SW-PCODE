@@ -21,8 +21,9 @@ services:
       REDIS_STREAM_GROUP_NAME: ${REDIS_STREAM_GROUP_NAME:-hdx_jp_sw_pcode_group}
       REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME:-hdx_jp_sw_pcode_consumer_1}
       HDX_URL: ${HDX_URL:-https://feature.data-humdata-org.ahconu.org}
-      HDX_KEY: ${HDX_KEY:-YOUR_HDX_TOKEN}
-    # entrypoint: [ "tail", "-f", "/dev/null" ]
+      HDX_KEY: ${HDX_KEY:-HDX_TOKEN}
+      HDX_SLACK_NOTIFICATION_CHANNEL: ${HDX_SLACK_NOTIFICATION_CHANNEL:-topic-pcode-notifications-dev}
+      HDX_SLACK_NOTIFICATION_ACCESS_TOKEN: ${HDX_SLACK_NOTIFICATION_ACCESS_TOKEN:-SLACK_TOKEN}
 
   # redis is only needed for testing and locally playing with redis
   # redis:
