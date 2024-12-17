@@ -244,6 +244,11 @@ def process_resource(
     if dataset["archived"]:
         return None
 
+    updated_by_script = dataset.get("updated_by_script", "").lower()
+    package_creator = dataset.get("package_creator", "").lower()
+    if package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script:
+        return None
+
     locations = [loc["name"].upper() for loc in dataset.data.get("groups", [])]
     pcodes = [pcode for iso in global_pcodes for pcode in global_pcodes[iso] if iso in locations]
     if len(pcodes) == 0:
