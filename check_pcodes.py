@@ -300,10 +300,10 @@ def process_resource(
     if not error and pcoded is None:
         pcoded = False
 
-    if error and pcoded is None:  # Only flag errors if pcoded status could not be determined
+    if error:
         error_message = f"{dataset['name']}: {resource['name']}: {error}"
         logger.error(error_message)
-        if flag:
+        if flag and pcoded is None:  # Only flag errors if pcoded status could not be determined
             send_to_slack(error_message)
 
     if cleanup:
