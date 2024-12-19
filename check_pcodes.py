@@ -276,33 +276,31 @@ def process_resource(
         if cleanup and parent_folders:
             remove_files(folders=parent_folders)
         if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+            error_message = f"{dataset['name']}: {resource['name']}: {error}"
+            logger.error(error_message)
+            if flag:
+                send_to_slack(error_message)
         return None
 
     contents, error = read_downloaded_data(resource_files, file_ext, configuration["number_of_rows"])
-
     if len(contents) == 0:
         if cleanup:
             remove_files(resource_files, parent_folders)
         if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
+            error_message = f"{dataset['name']}: {resource['name']}: {error}"
+            logger.error(error_message)
+            if flag:
+                send_to_slack(error_message)
         return None
 
     for key in contents:
         if not pcoded:
             pcoded = check_pcoded(contents[key], pcodes, configuration["percent_match"])
 
-    if pcoded:
-        if cleanup:
-            remove_files(resource_files, parent_folders)
-        if error:
-            logger.error(f"{dataset['name']}: {resource['name']}: {error}")
-        return pcoded
-
     if not error and pcoded is None:
         pcoded = False
 
-    if error:
+    if error and pcoded is None:  # Only flag errors if pcoded status could not be determined
         error_message = f"{dataset['name']}: {resource['name']}: {error}"
         logger.error(error_message)
         if flag:
@@ -317,7 +315,8 @@ def process_resource(
         except Exception:
             error_message = f"{dataset['name']}: {resource['name']}: Could not update resource"
             logger.exception(error_message)
-            send_to_slack(error_message)
-            raise
+            if flag:
+                send_to_slack(error_message)
+                raise
 
     return pcoded
