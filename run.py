@@ -89,6 +89,8 @@ def main(**ignore):
             for dataset in datasets:
                 resources = dataset.get_resources()
                 for resource in resources:
+                    if resource.get("p_coded") is not None:
+                        continue
                     pcoded = process_resource(
                         resource,
                         dataset,
