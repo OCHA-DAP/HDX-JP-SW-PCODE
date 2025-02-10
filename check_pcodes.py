@@ -82,8 +82,12 @@ def download_resource(resource: Resource, file_ext: str, retriever: Retrieve) ->
             resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
 
     elif file_ext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
-        resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
-        parent_folders = [resource_file]
+        try:
+            resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
+            parent_folders = [resource_file]
+        except:
+            error = f"Unable to read resource"
+            return [resource_file], None, error
 
     else:
         resource_files = [resource_file]
@@ -276,7 +280,7 @@ def process_resource(
         except:
             size = configuration["resource_size"]
 
-    if size >= configuration["resource_size"]:
+    if size is None or size >= configuration["resource_size"]:
         return None
 
     resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
