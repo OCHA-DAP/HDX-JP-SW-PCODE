@@ -17,6 +17,7 @@ from hdx.utilities.retriever import Retrieve
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
 from check_pcodes import get_global_pcodes, process_resource
+from helper.ckan import patch_resource_with_pcode_value
 from helper.facade import facade
 from helper.util import do_nothing_for_ever
 
@@ -83,7 +84,8 @@ def main(**ignore):
                 configuration["global_pcodes"],
                 retriever,
             )
-            datasets = Dataset.get_all_datasets(rows=1000)
+            updates = {}
+            datasets = Dataset.get_all_datasets()
             for dataset in datasets:
                 resources = dataset.get_resources()
                 for resource in resources:
@@ -95,7 +97,11 @@ def main(**ignore):
                         configuration,
                         cleanup=True,
                     )
-                    logger.info(f"{dataset['name']}: {resource['name']}: {pcoded}")
+                    if pcoded is not None:
+                        updates[resource["id"]] = pcoded
+            for resource_id, pcoded in updates.items():
+                patch_resource_with_pcode_value(resource_id, pcoded)
+            logger.info("Finished processing!")
 
 
 if __name__ == "__main__":
