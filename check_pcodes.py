@@ -321,9 +321,14 @@ def process_resource(
     if cleanup:
         remove_files(resource_files, parent_folders)
 
-    upd_message = f'Updating ? {update}. Pcoded ? {pcoded}. For resource {resource["id"]}, {resource["name"]}.'
-    logger.warning(upd_message)
-    send_to_slack(upd_message)
+    if pcoded is None:
+        return None
+
+    if flag:
+        upd_message = f'Updating ? {update}. Pcoded ? {pcoded}. For resource {resource["id"]}, {resource["name"]}.'
+        logger.warning(upd_message)
+        send_to_slack(upd_message)
+
     if update:
         try:
             patch_resource_with_pcode_value(resource["id"], pcoded)
