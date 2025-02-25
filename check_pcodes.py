@@ -79,7 +79,11 @@ def download_resource(resource: Resource, file_ext: str, retriever: Retrieve) ->
         if file_ext == "xlsx" and len(resource_files) == 0:
             resource_files = [resource_file]
         if file_ext in ["gdb", "gpkg"]:
-            resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+            try:
+                resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+            except:
+                error = f"Unable to read resource"
+                return resource_files, None, error
 
     elif file_ext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
         try:
