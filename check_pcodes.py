@@ -204,7 +204,10 @@ def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
         pcoded_header = any([bool(re.match(header_exp, hh, re.IGNORECASE)) for hh in headers])
         if not pcoded_header:
             continue
-        column = df[h].dropna().astype("string").str.upper()
+        column = df[h].dropna()
+        if len(column) == 0:
+            continue
+        column = column.astype("string").str.upper()
         column = column[~column.isin(["NA", "NAN", "NONE", "NULL", ""])]
         if len(column) == 0:
             continue
