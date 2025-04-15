@@ -17,7 +17,6 @@ from hdx.utilities.retriever import Retrieve
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
 from check_pcodes import get_global_pcodes, process_resource
-from helper.ckan import patch_resource_with_pcode_value
 from helper.facade import facade
 from helper.util import do_nothing_for_ever
 
@@ -88,8 +87,6 @@ def main(**ignore):
             for dataset in datasets:
                 resources = dataset.get_resources()
                 for resource in resources:
-                    if resource.get("p_coded") is not None:
-                        continue
                     pcoded = process_resource(
                         resource,
                         dataset,
