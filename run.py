@@ -84,7 +84,6 @@ def main(**ignore):
                 configuration["global_pcodes"],
                 retriever,
             )
-            updates = {}
             datasets = Dataset.get_all_datasets()
             for dataset in datasets:
                 resources = dataset.get_resources()
@@ -97,12 +96,9 @@ def main(**ignore):
                         global_pcodes,
                         retriever,
                         configuration,
+                        update=True,
                         cleanup=True,
                     )
-                    if pcoded is not None:
-                        updates[resource["id"]] = pcoded
-            for resource_id, pcoded in updates.items():
-                patch_resource_with_pcode_value(resource_id, pcoded)
             logger.info("Finished processing!")
 
 
