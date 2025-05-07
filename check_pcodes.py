@@ -295,9 +295,9 @@ def process_resource(
         return None
 
     resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
-    if not resource_files:
-        if cleanup and parent_folders:
-            remove_files(folders=parent_folders)
+    if error or not resource_files:
+        if cleanup:
+            remove_files(resource_files, parent_folders)
         if error:
             error_message = f"{dataset['name']}: {resource['name']}: {error}"
             logger.error(error_message)
