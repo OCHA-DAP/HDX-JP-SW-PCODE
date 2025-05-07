@@ -258,7 +258,11 @@ def process_resource(
 
     updated_by_script = dataset.get("updated_by_script", "").lower()
     package_creator = dataset.get("package_creator", "").lower()
-    if package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script:
+    org_name = dataset.get_organization()["name"]
+    if (
+            (package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script)
+            and org_name not in configuration["org_exceptions_check"]
+    ):
         return None
 
     locations = [loc["name"].upper() for loc in dataset.data.get("groups", [])]
@@ -272,7 +276,7 @@ def process_resource(
     if file_ext == "geopackage":
         file_ext = "gpkg"
 
-    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
+    if org_name in configuration["org_exceptions_no_check"]:
         return False
 
     if file_ext.lower() not in configuration["allowed_filetypes"]:
