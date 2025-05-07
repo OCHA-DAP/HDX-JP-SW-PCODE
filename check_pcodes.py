@@ -258,7 +258,7 @@ def process_resource(
 
     updated_by_script = dataset.get("updated_by_script", "").lower()
     package_creator = dataset.get("package_creator", "").lower()
-    org_name = dataset.get_organization()["name"]
+    org_name = dataset["organization"]["name"].lower()
     if (
             (package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script)
             and org_name not in configuration["org_exceptions_check"]
