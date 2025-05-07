@@ -220,6 +220,8 @@ def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
 
 
 def remove_files(files: List[str] = None, folders: List[str] = None) -> None:
+    if not files and not folders:
+        return
     if files:
         to_delete = files
         if folders:
