@@ -14,6 +14,8 @@ RUN apk add --no-cache git g++ gfortran proj-util && \
     pip install --no-cache-dir -r initial-requirements.txt && \
     pip install --no-cache-dir -r requirements.txt && \
     apk del .build-deps && \
+    # we need gdal libs at runtime
+    apk add gdal-dev && \
     rm -rf /var/cache/apk/*
 
 ENTRYPOINT [ "python3", "run.py" ]
