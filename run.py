@@ -25,13 +25,9 @@ logger = logging.getLogger(__name__)
 
 def listener_main(**ignore):
     """
-    Function to run when p-code detector is run in listener mode. 
+    Function to run when p-code detector is run in listener mode.
     Basically this waits for 'resource-created' OR 'resource-data-changed' events and runs the p-code checking logic.
     """
-
-    # Connect to Redis
-    event_bus = connect_to_hdx_event_bus_with_env_vars()
-
     configuration = Configuration.read()
 
     with temp_dir(folder="TempPCodeDetector") as temp_folder:
@@ -67,6 +63,10 @@ def listener_main(**ignore):
                     logger.error(f"Exception of type {type(exc).__name__} while processing dataset {dataset_id}: {str(exc)}")
                     return False, str(exc)
 
+    event_bus = connect_to_hdx_event_bus_with_env_vars()
+    # redis-py 8.0 introduced a default socket_timeout of 5s which causes xreadgroup(block=120s)
+    # to timeout prematurely. Set it above the block duration so only genuine hangs trigger it.
+    event_bus.redis_conn.connection_pool.connection_kwargs['socket_timeout'] = 3 * 60
     event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"], max_iterations=10_000)
 
 

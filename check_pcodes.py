@@ -187,8 +187,7 @@ def parse_tabular(df: DataFrame, file_ext: str) -> DataFrame:
 
 def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
     pcoded = None
-    header_exp = "((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
-
+    header_exp = r"((adm)?.*p?.?cod.*)|(#\s?adm\s?\d?\+?\s?p?(code)?)"
     for h in df.columns:
         if pcoded:
             break
