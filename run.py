@@ -67,7 +67,7 @@ def listener_main(**ignore):
     # redis-py 8.0 introduced a default socket_timeout of 5s which causes xreadgroup(block=120s)
     # to timeout prematurely. Set it above the block duration so only genuine hangs trigger it.
     event_bus.redis_conn.connection_pool.connection_kwargs['socket_timeout'] = 3 * 60
-    event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"])
+    event_bus.hdx_listen(event_processor, allowed_event_types=["resource-created", "resource-data-changed"], max_iterations=10_000)
 
 
 def main(**ignore):
