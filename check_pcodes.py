@@ -79,11 +79,19 @@ def download_resource(resource: Resource, file_ext: str, retriever: Retrieve) ->
         if file_ext == "xlsx" and len(resource_files) == 0:
             resource_files = [resource_file]
         if file_ext in ["gdb", "gpkg"]:
-            resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+            try:
+                resource_files = [join(r, i) for r in resource_files for i in listlayers(r)]
+            except:
+                error = f"Unable to read resource"
+                return resource_files, None, error
 
     elif file_ext in ["gdb", "gpkg"] and ".zip" not in basename(resource_file) and ".gz" not in basename(resource_file):
-        resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
-        parent_folders = [resource_file]
+        try:
+            resource_files = [join(resource_file, r) for r in listlayers(resource_file)]
+            parent_folders = [resource_file]
+        except:
+            error = f"Unable to read resource"
+            return [resource_file], None, error
 
     else:
         resource_files = [resource_file]
@@ -195,7 +203,8 @@ def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
         pcoded_header = any([bool(re.match(header_exp, hh, re.IGNORECASE)) for hh in headers])
         if not pcoded_header:
             continue
-        column = df[h].dropna().astype("string").str.upper()
+        column = df[h].astype("string", errors="ignore").dropna()
+        column = column.str.upper()
         column = column[~column.isin(["NA", "NAN", "NONE", "NULL", ""])]
         if len(column) == 0:
             continue
@@ -208,6 +217,8 @@ def check_pcoded(df: DataFrame, pcodes: List[str], match_cutoff: float) -> bool:
 
 
 def remove_files(files: List[str] = None, folders: List[str] = None) -> None:
+    if not files and not folders:
+        return
     if files:
         to_delete = files
         if folders:
@@ -246,7 +257,11 @@ def process_resource(
 
     updated_by_script = dataset.get("updated_by_script", "").lower()
     package_creator = dataset.get("package_creator", "").lower()
-    if package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script:
+    org_name = dataset["organization"]["name"].lower()
+    if (
+            (package_creator == "hdx data systems team" or "hdx scraper" in updated_by_script)
+            and org_name not in configuration["org_exceptions_check"]
+    ):
         return None
 
     locations = [loc["name"].upper() for loc in dataset.data.get("groups", [])]
@@ -260,7 +275,7 @@ def process_resource(
     if file_ext == "geopackage":
         file_ext = "gpkg"
 
-    if dataset.get_organization()["name"] in configuration["org_exceptions"]:
+    if org_name in configuration["org_exceptions_no_check"]:
         return False
 
     if file_ext.lower() not in configuration["allowed_filetypes"]:
@@ -275,13 +290,13 @@ def process_resource(
         except:
             size = configuration["resource_size"]
 
-    if size >= configuration["resource_size"]:
+    if size is None or size >= configuration["resource_size"]:
         return None
 
     resource_files, parent_folders, error = download_resource(resource, file_ext, retriever)
-    if not resource_files:
-        if cleanup and parent_folders:
-            remove_files(folders=parent_folders)
+    if error or not resource_files:
+        if cleanup:
+            remove_files(resource_files, parent_folders)
         if error:
             error_message = f"{dataset['name']}: {resource['name']}: {error}"
             logger.error(error_message)
@@ -316,9 +331,14 @@ def process_resource(
     if cleanup:
         remove_files(resource_files, parent_folders)
 
-    upd_message = f'Updating ? {update}. Pcoded ? {pcoded}. For resource {resource["id"]}, {resource["name"]}.'
-    logger.warning(upd_message)
-    send_to_slack(upd_message)
+    if pcoded is None:
+        return None
+
+    if flag:
+        upd_message = f'Updating ? {update}. Pcoded ? {pcoded}. For resource {resource["id"]}, {resource["name"]}.'
+        logger.warning(upd_message)
+        send_to_slack(upd_message)
+
     if update:
         try:
             patch_resource_with_pcode_value(resource["id"], pcoded)

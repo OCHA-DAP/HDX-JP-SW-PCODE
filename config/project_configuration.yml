@@ -21,5 +21,10 @@ percent_match: 0.9
 
 resource_size: 1073741824
 
-org_exceptions:
+org_exceptions_no_check:
   - "hot"
+  - "heidelberg-institute-for-geoinformation-technology"
+
+org_exceptions_check:
+  - "mimu"
+  - "igad-climate-prediction-and-application-center"

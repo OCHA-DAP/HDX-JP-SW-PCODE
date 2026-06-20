@@ -83,7 +83,7 @@ def main(**ignore):
                 configuration["global_pcodes"],
                 retriever,
             )
-            datasets = Dataset.get_all_datasets(rows=1000)
+            datasets = Dataset.get_all_datasets()
             for dataset in datasets:
                 resources = dataset.get_resources()
                 for resource in resources:
@@ -93,9 +93,10 @@ def main(**ignore):
                         global_pcodes,
                         retriever,
                         configuration,
+                        update=True,
                         cleanup=True,
                     )
-                    logger.info(f"{dataset['name']}: {resource['name']}: {pcoded}")
+            logger.info("Finished processing!")
 
 
 if __name__ == "__main__":
